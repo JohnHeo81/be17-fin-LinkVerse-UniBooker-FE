@@ -66,12 +66,13 @@ axiosInstance.interceptors.request.use(
       '/api/admin/signup',
       '/api/auth/login',
       '/api/users/signup',
+      '/api/image-upload',
     ]
 
-    const isPublicAPI = publicAPIs.some(api => config.url.includes(api))
+    const isPublicAPI = publicAPIs.some((api) => config.url.includes(api))
 
     if (isPublicAPI) {
-      config.withCredentials = false  // 쿠키 전송 안 함
+      config.withCredentials = false // 쿠키 전송 안 함
     }
 
     return config

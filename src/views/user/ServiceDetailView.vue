@@ -1,7 +1,7 @@
 <script setup>
 // ================= import ==================
 import { watch, onMounted, reactive, ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useAuthStore } from '@/stores/UseStore'
 
 import Input from '@/components/Input.vue'
@@ -13,7 +13,6 @@ import SeatBoard from '@/components/SeatBoard.vue'
 import ServiceApi from '@/services/user/service_api'
 import ReservationApi from '@/services/reservation/reservation_api'
 
-
 // =============== definition ================
 const route = useRoute()
 const router = useRouter()
@@ -22,29 +21,29 @@ const authStore = useAuthStore()
 const today = new Date()
 const todayStr = today.toISOString().slice(0, 10) // yyyy-mm-dd
 
-const dayMap = { SUN: '일', MON: '월', TUE: '화', WED: '수', THU: '목', FRI: '금', SAT: '토', }
+const dayMap = { SUN: '일', MON: '월', TUE: '화', WED: '수', THU: '목', FRI: '금', SAT: '토' }
 
-const showSeatModal = ref(false)                // 좌석 선택 모달 활성화 여부
-const showCalendar = ref(false)                 // Calendar 모달 활성화 여부
+const showSeatModal = ref(false) // 좌석 선택 모달 활성화 여부
+const showCalendar = ref(false) // Calendar 모달 활성화 여부
 
-const service = reactive({})                    // 리소스 정보
-const resourceCustomFieldValues = reactive([])  // 리소스 커스텀 필드 값 (조회용)
-const userCustomFields = reactive([])           // 사용자 입력 커스텀 필드
-const userCustomFieldValuesForm = reactive([])  // 사용자 입력 커스텀 필드 값 요청 폼 (입력용)
-const times = reactive([])                      // 정규 운영 시간
-const exceptionTimeSlots = reactive([])         // 예외 운영 시간
-const yearMonthTimeSlots = ref([])              // 년/월 선택에 따른 모든 일자 별의 운영 가능 시간
-const resourceReservations = ref([])            // 특정 리소스의 예약 목록
-const reservedTimes = ref([])                   // 특정 리소스에 예약된 시간 목록 저장할 배열
+const service = reactive({}) // 리소스 정보
+const resourceCustomFieldValues = reactive([]) // 리소스 커스텀 필드 값 (조회용)
+const userCustomFields = reactive([]) // 사용자 입력 커스텀 필드
+const userCustomFieldValuesForm = reactive([]) // 사용자 입력 커스텀 필드 값 요청 폼 (입력용)
+const times = reactive([]) // 정규 운영 시간
+const exceptionTimeSlots = reactive([]) // 예외 운영 시간
+const yearMonthTimeSlots = ref([]) // 년/월 선택에 따른 모든 일자 별의 운영 가능 시간
+const resourceReservations = ref([]) // 특정 리소스의 예약 목록
+const reservedTimes = ref([]) // 특정 리소스에 예약된 시간 목록 저장할 배열
 
-const availableTimes = ref([])                                  // 선택 가능한 운영 시간 목록 (버튼용)
+const availableTimes = ref([]) // 선택 가능한 운영 시간 목록 (버튼용)
 const selectedDate = ref(new Date().toISOString().slice(0, 10)) // 선택한 날짜
-const selectedTime = ref(null)                                  // 선택한 시간
-const selectedYear = ref(new Date().getFullYear())              // 선택한 년도
-const selectedMonth = ref(new Date().getMonth() + 1)            // 선택한 월
-const selectedHeadCount = ref(1)                                // 선택한 인원수
-const selectedRow = ref(null)                                   // 선택한 좌석 행
-const selectedCol = ref(null)                                   // 선택한 좌석 열
+const selectedTime = ref(null) // 선택한 시간
+const selectedYear = ref(new Date().getFullYear()) // 선택한 년도
+const selectedMonth = ref(new Date().getMonth() + 1) // 선택한 월
+const selectedHeadCount = ref(1) // 선택한 인원수
+const selectedRow = ref(null) // 선택한 좌석 행
+const selectedCol = ref(null) // 선택한 좌석 열
 
 // 예약 요청 폼
 const reservationForm = computed(() => ({
@@ -73,15 +72,18 @@ const getResourceCustomFieldValues = async () => {
 const getUserCustomFields = async () => {
   const response = await ServiceApi.getUserCustomFields(route.params.serviceGroupId)
   Object.assign(userCustomFields, response)
-  Object.assign(userCustomFieldValuesForm, userCustomFields.map((field) => ({
-    customFieldId: field.id,
-    values: [''],
-  })))
+  Object.assign(
+    userCustomFieldValuesForm,
+    userCustomFields.map((field) => ({
+      customFieldId: field.id,
+      values: [''],
+    })),
+  )
 }
 
 // --- 정규 운영 시간 조회
 const getTimeSlots = async () => {
-  const response = await ServiceApi.getTimeSlots(route.params.itemId) 
+  const response = await ServiceApi.getTimeSlots(route.params.itemId)
   Object.assign(times, response)
 
   // 요일별 시간 매핑
@@ -116,10 +118,12 @@ const getExceptionTimeSlots = async () => {
   })
 
   // 한글 요일로 변환
-  resourceCustomFieldValues.exceptionTimeSlots = Object.entries(groupedExceptions).map(([date, slots]) => ({
-    date,
-    slots,
-  }))
+  resourceCustomFieldValues.exceptionTimeSlots = Object.entries(groupedExceptions).map(
+    ([date, slots]) => ({
+      date,
+      slots,
+    }),
+  )
 }
 
 // --- 년/월 선택에 따른 예외 포함한 운영 시간 조회
@@ -131,11 +135,15 @@ const getYearMonthTimeSlots = async (serviceId, year, month) => {
 
 // --- 특정 리소스에 예약된 목록 조회
 const getResourceReservations = async (startDate, endDate) => {
-  const response = await ReservationApi.getResourceReservations(route.params.itemId, startDate, endDate)
+  const response = await ReservationApi.getResourceReservations(
+    route.params.itemId,
+    startDate,
+    endDate,
+  )
 
   if (response && response.isSuccess) {
     resourceReservations.value = response.data.list.filter((res) => res.status === 'CONFIRMED')
-    reservedTimes.value = response.data.list.map(res => res.startDate.slice(11, 16)) // 예약된 시간만 추출해서 배열로 저장 "09:00"
+    reservedTimes.value = response.data.list.map((res) => res.startDate.slice(11, 16)) // 예약된 시간만 추출해서 배열로 저장 "09:00"
     console.log('🌟예약된 시간 추출 : ', reservedTimes)
   } else {
     alert('잘못된 요청입니다.')
@@ -162,7 +170,7 @@ const reserve = async () => {
 const formatCustomFieldValues = (values) => {
   const data = ref('')
   for (value in values) {
-    data.value.concat(value+' ')
+    data.value.concat(value + ' ')
   }
   return data
 }
@@ -221,14 +229,14 @@ watch(selectedDate, () => {
   selectedCol.value = null
   selectedHeadCount.value = 1
   availableTimes.value = []
-  userCustomFieldValuesForm.forEach(field => {
-    field.values = field.values.map(() => '')  // 기존 값들을 모두 빈 문자열로 초기화
+  userCustomFieldValuesForm.forEach((field) => {
+    field.values = field.values.map(() => '') // 기존 값들을 모두 빈 문자열로 초기화
   })
 
   if (!selectedDate.value || yearMonthTimeSlots.value.length === 0) return
 
   // 현재 선택한 날짜에 해당하는 시간 슬롯 목록 찾기
-  const daySlot = yearMonthTimeSlots.value.find((d) => d.date === selectedDate.value) 
+  const daySlot = yearMonthTimeSlots.value.find((d) => d.date === selectedDate.value)
 
   if (!daySlot) {
     availableTimes.value = []
@@ -248,7 +256,10 @@ watch(selectedDate, () => {
   }))
 
   // 특정 리소스에 예약된 목록 조회
-  getResourceReservations(toLocalDateTimeStart(selectedDate.value), toLocalDateTimeEnd(selectedDate.value))
+  getResourceReservations(
+    toLocalDateTimeStart(selectedDate.value),
+    toLocalDateTimeEnd(selectedDate.value),
+  )
 })
 
 // -- 선택한 시간이 변경되면 선택 값들 초기화
@@ -256,8 +267,8 @@ watch(selectedTime, () => {
   selectedRow.value = null
   selectedCol.value = null
   selectedHeadCount.value = 1
-  userCustomFieldValuesForm.forEach(field => {
-    field.values = field.values.map(() => '') 
+  userCustomFieldValuesForm.forEach((field) => {
+    field.values = field.values.map(() => '')
   })
 })
 
@@ -274,7 +285,9 @@ const isTimeClosed = (time) => {
 
   if (service.category === 'SEAT') {
     // 현재 시간대에 예약된 좌석 수
-    const reservedCount = resourceReservations.value.filter((r) => r.startDate.slice(11, 16) === time).length
+    const reservedCount = resourceReservations.value.filter(
+      (r) => r.startDate.slice(11, 16) === time,
+    ).length
 
     // 좌석 전부 예약되었으면 마감
     return reservedCount >= service.capacity
@@ -284,8 +297,12 @@ const isTimeClosed = (time) => {
 }
 
 // --- 인원수 증감
-const increase = () => { if (selectedHeadCount.value < service.capacity) selectedHeadCount.value += 1 }
-const decrease = () => { if (selectedHeadCount.value > 1) selectedHeadCount.value -= 1 }
+const increase = () => {
+  if (selectedHeadCount.value < service.capacity) selectedHeadCount.value += 1
+}
+const decrease = () => {
+  if (selectedHeadCount.value > 1) selectedHeadCount.value -= 1
+}
 
 // --- 좌석 선택
 const selectSeat = ({ row, col }) => {
@@ -340,7 +357,6 @@ const onCheckboxChange = (index, option, checked) => {
   }
 }
 
-
 // =============== 화면 로드시 데이터 조회 ===============
 onMounted(() => {
   getService()
@@ -351,24 +367,52 @@ onMounted(() => {
   getYearMonthTimeSlots(route.params.itemId, today.getFullYear(), today.getMonth() + 1)
   getResourceReservations(toLocalDateTimeStart(todayStr), toLocalDateTimeEnd(todayStr))
 })
+
+// 뒤로가기/페이지 이탈 시 서비스 목록으로 이동
+onBeforeRouteLeave((to, from, next) => {
+  const serviceGroupId = route.params.serviceGroupId
+  const companySlug = route.params.companySlug
+  const serviceListPath = `/c/${companySlug}/services/${serviceGroupId}`
+
+  // 예약 완료 페이지로 가는 경우는 허용
+  if (to.path.includes('/reservation/completed')) {
+    next()
+    return
+  }
+
+  // 서비스 목록으로 가는 경우는 허용 (무한 루프 방지)
+  if (to.path.startsWith(serviceListPath) && !to.path.includes('/detail/')) {
+    next()
+    return
+  }
+
+  // 그 외 이탈 시 → 서비스 목록으로 리다이렉트
+  console.log('[ServiceDetail] 페이지 이탈 → 서비스 목록으로 이동')
+  next({ path: serviceListPath, replace: true })
+})
 </script>
 
 <template>
   <div class="detail-page">
     <!-- 좌석 선택 모달 -->
-    <Modal :open="showSeatModal" :closeOnOverlay="false" @close="showSeatModal=false">
-      <SeatBoard 
-        :service="service" 
-        :selectedTime="selectedTime" 
-        :resourceReservations="resourceReservations" 
-        @selectSeat="selectSeat" />
+    <Modal :open="showSeatModal" :closeOnOverlay="false" @close="showSeatModal = false">
+      <SeatBoard
+        :service="service"
+        :selectedTime="selectedTime"
+        :resourceReservations="resourceReservations"
+        @selectSeat="selectSeat"
+      />
       <div class="p-6">
         <Button @click="showSeatModal = false">선택하기</Button>
       </div>
     </Modal>
 
     <!-- 상단 이미지 -->
-    <img :src="service.resourceImage || '/assets/images/no-image.png'" alt="회의실" class="header-image" />
+    <img
+      :src="service.resourceImage || '/assets/images/no-image.png'"
+      alt="회의실"
+      class="header-image"
+    />
 
     <div class="content-wrapper">
       <!-- 왼쪽 영역 -->
@@ -383,7 +427,10 @@ onMounted(() => {
               <td>
                 <table class="inner-table">
                   <tbody>
-                    <tr v-for="(daySlot, index) in resourceCustomFieldValues.dailyTimeSlots" :key="index">
+                    <tr
+                      v-for="(daySlot, index) in resourceCustomFieldValues.dailyTimeSlots"
+                      :key="index"
+                    >
                       <td class="font-semibold align-top w-8">{{ daySlot.day }}</td>
                       <td>
                         <div v-for="(slot, sIndex) in daySlot.slots" :key="sIndex">
@@ -404,7 +451,9 @@ onMounted(() => {
             <!-- 리소스의 커스텀 필드 -->
             <tr v-for="item in resourceCustomFieldValues">
               <th>{{ item.fieldName }}</th>
-              <td>{{ item.values.length > 1 ? formatCustomFieldValues(item.values) : item.values[0] }}</td>
+              <td>
+                {{ item.values.length > 1 ? formatCustomFieldValues(item.values) : item.values[0] }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -412,22 +461,37 @@ onMounted(() => {
 
       <!-- 오른쪽 영역 : 사용자 예약 박스 -->
       <div class="reservation-box">
-        <div v-if="(service.category === 'RESERVATION' || service.category === 'SEAT')" class="form-group">
+        <div
+          v-if="service.category === 'RESERVATION' || service.category === 'SEAT'"
+          class="form-group"
+        >
           <label>날짜</label>
-           <div class="relative" @click="toggleCalendar">
+          <div class="relative" @click="toggleCalendar">
             <Input type="text" class="cursor-pointer" v-model="selectedDate" readonly />
             <div v-if="showCalendar" class="date-picker" @click.stop>
-              <Calendar @select="selectDate" :disabledDates="disabledDates" :selectedDate="selectedDate"/>
+              <Calendar
+                @select="selectDate"
+                :disabledDates="disabledDates"
+                :selectedDate="selectedDate"
+              />
             </div>
           </div>
         </div>
 
-        <div v-if="(service.category === 'RESERVATION' || service.category === 'SEAT') && times" class="form-group">
+        <div
+          v-if="(service.category === 'RESERVATION' || service.category === 'SEAT') && times"
+          class="form-group"
+        >
           <label>시간</label>
           <div v-if="availableTimes.length" class="time-grid">
-            <button v-for="(time, index) in availableTimes" :key="index" 
+            <button
+              v-for="(time, index) in availableTimes"
+              :key="index"
               :disabled="isTimeClosed(time.startTime)"
-              :class="['time-btn', { active: selectedTime === time.startTime, block: isTimeClosed(time.startTime)}]" 
+              :class="[
+                'time-btn',
+                { active: selectedTime === time.startTime, block: isTimeClosed(time.startTime) },
+              ]"
               @click="!isTimeClosed(time.startTime) && (selectedTime = time.startTime)"
             >
               {{ time.startTime }}
@@ -435,7 +499,7 @@ onMounted(() => {
           </div>
           <div v-else class="text-gray-400 text-sm">해당 날짜는 운영 시간이 없습니다.</div>
         </div>
-        
+
         <div v-if="service.category !== 'SEAT'" class="form-group">
           <label>인원수</label>
           <div class="people-control">
@@ -449,76 +513,96 @@ onMounted(() => {
           <label>좌석 선택</label>
           <div class="flex flex-row justify-between gap-3 text-sm text-gray-500">
             <span>선택한 좌석</span>
-            <span @click="showSeatModal = true">{{ selectedRow && selectedCol ? selectedRow + '행 ' + selectedCol + '열' : '없음'  }}</span>
+            <span @click="showSeatModal = true">{{
+              selectedRow && selectedCol ? selectedRow + '행 ' + selectedCol + '열' : '없음'
+            }}</span>
           </div>
         </div>
-
-
 
         <!-- 사용자 커스텀 필드 -->
         <div v-for="(item, index) in userCustomFields" :key="item.id">
           <div class="form-group">
-              <label>{{ item.fieldName }}</label>
-              <div>
-                  <Input v-if="item.dataType === 'TEXT'" type="text" placeholder="텍스트를 입력해주세요." v-model="userCustomFieldValuesForm[index].values[0]" />
-                  <Input v-else-if="item.dataType ==='DATE'" type="date" v-model="userCustomFieldValuesForm[index].values[0]" />
-                  <Input v-else-if="item.dataType ==='TIME'" type="time" v-model="userCustomFieldValuesForm[index].values[0]" />
-                  <Input v-else-if="item.dataType ==='NUMBER'" type="number" placeholder="숫자를 입력해주세요." v-model="userCustomFieldValuesForm[index].values[0]" />                  
-                  <div v-else-if="item.dataType === 'RADIO'" class="desc">
-                    <!-- options 있을 때 -->
-                    <template v-if="item.options && item.options.length > 0">
-                      <Input
-                        v-for="option in item.options"
-                        :key="option"
-                        type="radio"
-                        :label="option"
-                        :value="option"
-                        :name="'radio-' + item.id"
-                        v-model="userCustomFieldValuesForm[index].values[0]"
-                      />
-                    </template>
-                    <!-- options 없을 때 -->
-                    <template v-else>
-                      <Input
-                        type="radio"
-                        label="예"
-                        value="true"
-                        :name="'radio-' + item.id"
-                        v-model="userCustomFieldValuesForm[index].values[0]"
-                      />
-                      <Input
-                        type="radio"
-                        label="아니오"
-                        value="false"
-                        :name="'radio-' + item.id"
-                        v-model="userCustomFieldValuesForm[index].values[0]"
-                      />
-                    </template>
-                  </div>
-                  <div v-else-if="item.dataType === 'CHECKBOX'">
-                    <!-- options 있을 때 -->
-                    <template v-if="item.options && item.options.length > 0">
-                      <Input
-                        v-for="option in item.options"
-                        :key="option"
-                        type="checkbox"
-                        :label="option"
-                        :value="option"
-                        :checked="userCustomFieldValuesForm[index].values.includes(option)"
-                        @update:modelValue="checked => onCheckboxChange(index, option, checked)"
-                      />
-                    </template>
-                    <!-- options 없을 때 -->
-                    <template v-else>
-                      <Input
-                        type="checkbox"
-                        :label="item.fieldName"
-                        :checked="userCustomFieldValuesForm[index].values[0] === true"
-                        @update:modelValue="checked => userCustomFieldValuesForm[index].values = [checked]"
-                      />
-                    </template>
-                  </div>
-                </div>
+            <label>{{ item.fieldName }}</label>
+            <div>
+              <Input
+                v-if="item.dataType === 'TEXT'"
+                type="text"
+                placeholder="텍스트를 입력해주세요."
+                v-model="userCustomFieldValuesForm[index].values[0]"
+              />
+              <Input
+                v-else-if="item.dataType === 'DATE'"
+                type="date"
+                v-model="userCustomFieldValuesForm[index].values[0]"
+              />
+              <Input
+                v-else-if="item.dataType === 'TIME'"
+                type="time"
+                v-model="userCustomFieldValuesForm[index].values[0]"
+              />
+              <Input
+                v-else-if="item.dataType === 'NUMBER'"
+                type="number"
+                placeholder="숫자를 입력해주세요."
+                v-model="userCustomFieldValuesForm[index].values[0]"
+              />
+              <div v-else-if="item.dataType === 'RADIO'" class="desc">
+                <!-- options 있을 때 -->
+                <template v-if="item.options && item.options.length > 0">
+                  <Input
+                    v-for="option in item.options"
+                    :key="option"
+                    type="radio"
+                    :label="option"
+                    :value="option"
+                    :name="'radio-' + item.id"
+                    v-model="userCustomFieldValuesForm[index].values[0]"
+                  />
+                </template>
+                <!-- options 없을 때 -->
+                <template v-else>
+                  <Input
+                    type="radio"
+                    label="예"
+                    value="true"
+                    :name="'radio-' + item.id"
+                    v-model="userCustomFieldValuesForm[index].values[0]"
+                  />
+                  <Input
+                    type="radio"
+                    label="아니오"
+                    value="false"
+                    :name="'radio-' + item.id"
+                    v-model="userCustomFieldValuesForm[index].values[0]"
+                  />
+                </template>
+              </div>
+              <div v-else-if="item.dataType === 'CHECKBOX'">
+                <!-- options 있을 때 -->
+                <template v-if="item.options && item.options.length > 0">
+                  <Input
+                    v-for="option in item.options"
+                    :key="option"
+                    type="checkbox"
+                    :label="option"
+                    :value="option"
+                    :checked="userCustomFieldValuesForm[index].values.includes(option)"
+                    @update:modelValue="(checked) => onCheckboxChange(index, option, checked)"
+                  />
+                </template>
+                <!-- options 없을 때 -->
+                <template v-else>
+                  <Input
+                    type="checkbox"
+                    :label="item.fieldName"
+                    :checked="userCustomFieldValuesForm[index].values[0] === true"
+                    @update:modelValue="
+                      (checked) => (userCustomFieldValuesForm[index].values = [checked])
+                    "
+                  />
+                </template>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -580,10 +664,10 @@ onMounted(() => {
 /* 오른쪽 예약 영역 */
 .reservation-box {
   @apply w-full lg:w-1/3 border border-gray-200 rounded-xl shadow-md p-5 sm:shadow-md p-6 flex flex-col gap-6 bg-white;
-  position: sticky;   /* 스크롤 시 고정 */
-  top: 80px;          /* 상단에서 떨어진 거리 */
-  max-height: 500px;  /* 고정 높이 설정 */
-  overflow-y: auto;   /* 내부 스크롤 가능 */
+  position: sticky; /* 스크롤 시 고정 */
+  top: 80px; /* 상단에서 떨어진 거리 */
+  max-height: 500px; /* 고정 높이 설정 */
+  overflow-y: auto; /* 내부 스크롤 가능 */
   /* position: relative; */
 }
 
@@ -613,7 +697,7 @@ onMounted(() => {
 }
 
 .time-btn.block {
-  @apply opacity-50 cursor-not-allowed bg-gray-200 text-gray-500 border-gray-300
+  @apply opacity-50 cursor-not-allowed bg-gray-200 text-gray-500 border-gray-300;
 }
 
 /* 인원수 */
@@ -644,5 +728,4 @@ onMounted(() => {
   white-space: nowrap;
   width: 2rem; /* 요일 칸 좁게 */
 }
-
 </style>

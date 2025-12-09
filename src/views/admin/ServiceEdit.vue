@@ -10,7 +10,7 @@ import serviceApi from '@/services/service/service_api'
 const route = useRoute()
 const router = useRouter()
 const serviceId = route.params.serviceId
-const serviceGroupId = route.query.serviceGroupId
+const serviceGroupId = route.params.serviceGroupId
 const serviceGroup = ref(null)
 
 // 서비스 정보
@@ -222,9 +222,8 @@ const onFileChange = async (event) => {
     if (!presignedUrl) throw new Error('Presigned URL을 가져오지 못했습니다.')
     await serviceApi.uploadImage(presignedUrl, file)
 
-    const cloudFrontDomain = 'https://d2h9e9y86awp4t.cloudfront.net'
-    const s3Path = presignedUrl.split('.com')[1].split('?')[0]
-    thumbnail.value = cloudFrontDomain + s3Path
+    // S3 URL 직접 사용 (Presigned 파라미터 제거)
+    thumbnail.value = presignedUrl.split('?')[0]
   } catch (error) {
     console.error('이미지 업로드 과정에서 오류 발생:', error)
     alert('이미지 업로드 중 오류가 발생했습니다.')

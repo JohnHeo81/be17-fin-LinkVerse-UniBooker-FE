@@ -12,10 +12,8 @@ const serviceId = Number(route.params.serviceId)
 const serviceGroupId = route.params.serviceGroupId
 const companySlug = route.params.companySlug
 
-// ----------- TOKEN 관리 로직 (핵심) -----------
+// ----------- TOKEN 관리 -----------
 const LOCAL_KEY = `queueToken:${serviceId}`
-
-// localStorage에서 기존 토큰 불러오기
 const queueToken = ref(localStorage.getItem(LOCAL_KEY) || null)
 
 // 화면 상태
@@ -26,7 +24,7 @@ const estimatedWaitSeconds = ref(null)
 
 let pollingTimer = null
 
-/** 서비스 정보 */
+/** 서비스 정보 조회 */
 const loadServiceInfo = async () => {
   try {
     serviceInfo.value = await serviceApi.getService(serviceId)
@@ -35,9 +33,8 @@ const loadServiceInfo = async () => {
   }
 }
 
-/** JOIN 요청 (동일 token 보호) */
+/** 대기열 진입 */
 const joinQueue = async () => {
-  // 이미 토큰 있으면 join 금지 (중복 join 차단)
   if (queueToken.value) {
     console.log('[QUEUE] 기존 token 있음 → join 생략', queueToken.value)
     return
@@ -49,7 +46,6 @@ const joinQueue = async () => {
 
     queueToken.value = res.token
     localStorage.setItem(LOCAL_KEY, res.token)
-
     userQueuePosition.value = res.position
 
     console.log('[QUEUE] join 성공, token=', res.token)
@@ -58,6 +54,7 @@ const joinQueue = async () => {
   }
 }
 
+/** 대기열 상태 조회 (Polling) */
 const fetchQueueStatus = async () => {
   if (!queueToken.value) return
 
@@ -65,14 +62,16 @@ const fetchQueueStatus = async () => {
     const res = await queueApi.getQueueStatus(serviceId, queueToken.value)
 
     userQueuePosition.value = res.position
-    totalQueueSize.value = res.length
+    totalQueueSize.value = res.totalWaiting
     estimatedWaitSeconds.value = res.etaSeconds
 
     console.log('[QUEUE STATUS]', res)
 
-    // ----- 1) ACTIVE 상태 (0번) -----
-    if (res.position === 0) {
-      console.log('[QUEUE] ACTIVE → 상세페이지 이동')
+    // ----- 1) 입장 가능 -----
+    if (res.canEnter) {
+      console.log('[QUEUE] ACTIVE → 토큰 소비 후 상세페이지 이동')
+
+      await queueApi.consumeQueueToken(serviceId, queueToken.value)
 
       clearInterval(pollingTimer)
       localStorage.removeItem(LOCAL_KEY)
@@ -81,7 +80,7 @@ const fetchQueueStatus = async () => {
       return
     }
 
-    // ----- 2) INVALID TOKEN (-1) → 재입장 -----
+    // ----- 2) 토큰 만료 → 재입장 -----
     if (res.position === -1) {
       console.warn('[QUEUE] INVALID TOKEN → rejoin')
 
@@ -92,16 +91,15 @@ const fetchQueueStatus = async () => {
       return
     }
 
-    // ----- 3) WAITING 상태 -----
-    // 아무것도 안 함 (그냥 대기 유지)
+    // ----- 3) 대기 중 -----
   } catch (err) {
     console.error('대기열 상태 조회 실패', err)
   }
 }
 
-/** ACTIVE → 상세 페이지 이동 */
+/** 상세 페이지 이동 (replace로 히스토리 교체) */
 const navigateToDetail = () => {
-  router.push({
+  router.replace({
     path: `/c/${companySlug}/services/${serviceGroupId}/detail/${serviceId}`,
   })
 }
@@ -109,15 +107,10 @@ const navigateToDetail = () => {
 /** Lifecycle */
 onMounted(async () => {
   await loadServiceInfo()
-
-  // 최초 join (또는 기존 token 재사용)
   await joinQueue()
-
-  // 첫 polling
   await fetchQueueStatus()
 
-  // polling 반복
-  pollingTimer = setInterval(fetchQueueStatus, 1000)
+  pollingTimer = setInterval(fetchQueueStatus, 3000)
 })
 
 onBeforeUnmount(() => {
@@ -185,7 +178,6 @@ onBeforeUnmount(() => {
   @apply max-w-3xl mx-auto px-10 pt-14 pb-20 flex flex-col;
 }
 
-/* 헤더 */
 .waiting-header {
   @apply flex items-center gap-8 bg-gray-100 p-6 rounded-sm shadow-sm mb-10;
 }
@@ -206,7 +198,6 @@ onBeforeUnmount(() => {
   @apply text-sm text-gray-500 leading-relaxed;
 }
 
-/* 대기 박스 */
 .waiting-box {
   @apply bg-gray-50 p-10 rounded-lg shadow-sm text-center;
 }
@@ -235,7 +226,6 @@ onBeforeUnmount(() => {
   @apply text-sm text-gray-600 mt-4 leading-relaxed;
 }
 
-/* 로딩 애니메이션 */
 .waiting-loader {
   @apply mx-auto mt-8 w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin;
 }

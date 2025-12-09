@@ -19,6 +19,7 @@ const getServiceGroupPresignedURL = async (formData) => {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      withCredentials: false,
     })
 
     const uploadUrl = response.data.result || response.data.data

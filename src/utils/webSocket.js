@@ -16,11 +16,14 @@ export function connectWebSocket() {
 
     console.log('🛰️ WebSocket 연결 시도 중...')
 
-    // ✅ 환경변수에서 WebSocket URL 가져오기
-    const wsUrl = import.meta.env.VITE_WS_URL || '/ws'
-
+    // 환경변수에서 API URL 가져와서 WebSocket URL 생성
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+    const wsUrl = `${apiBaseUrl}/ws`
+    
+    console.log('WebSocket URL:', wsUrl)
+    
     const socket = new SockJS(wsUrl, null, {
-      withCredentials: true,
+      withCredentials: true, // ✅ 쿠키 자동 전송
     })
 
     stompClient = Stomp.over(socket)

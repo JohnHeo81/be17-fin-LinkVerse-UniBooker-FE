@@ -75,9 +75,7 @@ const onFileChange = async (event) => {
     await serviceApi.uploadImage(presignedUrl, file)
 
     // 3. CloudFront URL로 변환
-    const cloudFrontDomain = 'https://d2h9e9y86awp4t.cloudfront.net'
-    const s3Path = presignedUrl.split('.com')[1].split('?')[0] // 쿼리 제거
-    thumbnail.value = cloudFrontDomain + s3Path
+    thumbnail.value = presignedUrl.split('?')[0]
 
     console.log('CloudFront URL:', thumbnail.value)
   } catch (error) {

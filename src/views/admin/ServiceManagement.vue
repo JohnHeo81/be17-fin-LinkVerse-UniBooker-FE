@@ -162,8 +162,8 @@ const goToEditService = (serviceId) => {
   }
   router.push({
     name: 'ServiceEdit',
-    params: { serviceId },
-    query: { serviceGroupId, serviceGroupName },
+    params: { serviceGroupId, serviceId },
+    query: { serviceGroupName },
   })
 }
 

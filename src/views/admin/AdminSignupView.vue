@@ -173,15 +173,12 @@ const handleFileUpload = async (event) => {
     // 2. S3에 직접 업로드
     await adminApi.uploadImage(presignedUrl, file)
 
-    // 3. CloudFront URL 생성
-    const cloudFrontDomain =
-      import.meta.env.VITE_CLOUDFRONT_URL || 'https://d2h9e9y86awp4t.cloudfront.net'
-    const s3Path = presignedUrl.split('.com')[1].split('?')[0]
-    const fullUrl = cloudFrontDomain + s3Path
+    // 3. S3 URL 생성
+    const imageUrl = presignedUrl.split('?')[0]
 
     // 4. formData에 URL 저장
-    formData.logoUrl = fullUrl
-    thumbnail.value = fullUrl
+    formData.logoUrl = imageUrl
+    thumbnail.value = imageUrl
   } catch (err) {
     console.error('이미지 업로드 오류:', err)
     alert('이미지 업로드 중 오류가 발생했습니다.')

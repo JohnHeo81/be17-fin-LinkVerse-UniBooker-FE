@@ -114,7 +114,7 @@ const handleLogoFileChange = async (event) => {
     // 1. Presigned URL 요청
     const uploadForm = new FormData()
     uploadForm.append('file', file)
-    uploadForm.append('imageType', 'serviceGroup')
+    uploadForm.append('imageType', 'companyLogo')
 
     const presignedUrl = await adminApi.getPresignedURL(uploadForm)
     if (!presignedUrl) {
@@ -124,15 +124,12 @@ const handleLogoFileChange = async (event) => {
     // 2. S3에 직접 업로드
     await adminApi.uploadImage(presignedUrl, file)
 
-    // 3. CloudFront URL 생성
-    const cloudFrontDomain =
-      import.meta.env.VITE_CLOUDFRONT_URL || 'https://d2h9e9y86awp4t.cloudfront.net'
-    const s3Path = presignedUrl.split('.com')[1].split('?')[0]
-    const fullUrl = cloudFrontDomain + s3Path
+    // 3. S3 URL 직접 사용 (쿼리스트링만 제거)
+    const s3Url = presignedUrl.split('?')[0]
 
     // 4. editInfo에 URL 저장
-    editInfo.value.logoUrl = fullUrl
-    logoPreviewUrl.value = fullUrl
+    editInfo.value.logoUrl = s3Url
+    logoPreviewUrl.value = s3Url
   } catch (error) {
     console.error('이미지 업로드 오류:', error)
     alert('이미지 업로드 중 오류가 발생했습니다.')
@@ -333,9 +330,44 @@ const triggerFileInput = () => {
         </div>
       </template>
 
-      <!-- 비밀번호 변경 모드 (기존 유지) -->
+      <!-- 비밀번호 변경 모드 -->
       <template v-else-if="mode === 'password'">
-        <!-- ... -->
+        <div class="modal-header">
+          <h3>비밀번호 변경</h3>
+        </div>
+
+        <div class="modal-input-section">
+          <label>현재 비밀번호</label>
+          <input
+            v-model="passwordInfo.currentPassword"
+            type="password"
+            class="modal-input"
+            placeholder="현재 비밀번호 입력"
+          />
+        </div>
+        <div class="modal-input-section">
+          <label>새 비밀번호</label>
+          <input
+            v-model="passwordInfo.newPassword"
+            type="password"
+            class="modal-input"
+            placeholder="새 비밀번호 입력"
+          />
+        </div>
+        <div class="modal-input-section">
+          <label>비밀번호 확인</label>
+          <input
+            v-model="passwordInfo.confirmPassword"
+            type="password"
+            class="modal-input"
+            placeholder="새 비밀번호 확인"
+          />
+        </div>
+
+        <div class="modal-button-container">
+          <Button theme="gray" size="sm" @click="mode = 'view'">취소</Button>
+          <Button size="sm" @click="handlePasswordSubmit">변경</Button>
+        </div>
       </template>
     </div>
   </Modal>

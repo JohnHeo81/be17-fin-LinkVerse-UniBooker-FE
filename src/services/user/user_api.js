@@ -172,7 +172,7 @@ const changePassword = async (passwordData) => {
 const withdrawUser = async (withdrawData) => {
   try {
     const response = await axiosInstance.delete('/api/users/profile', {
-      data: withdrawData
+      data: withdrawData,
     })
     return response.data
   } catch (error) {
@@ -189,7 +189,7 @@ const withdrawUser = async (withdrawData) => {
 const resetPassword = async (email, companyId) => {
   try {
     const response = await axiosInstance.post('/api/users/reset-password', null, {
-      params: { email, companyId }
+      params: { email, companyId },
     })
     return response.data
   } catch (error) {
@@ -234,7 +234,7 @@ const getCurrentUser = async () => {
  */
 const refreshToken = async () => {
   try {
-    const response = await axiosInstance.post('/api/users/refresh')
+    const response = await axiosInstance.post('/api/auth/refresh')
     return response.data
   } catch (error) {
     console.error('Token 갱신 실패:', error)
@@ -245,22 +245,22 @@ const refreshToken = async () => {
 export default {
   // 기업 정보
   getCompanyBySlug,
-  
+
   // 회원가입 관련
   checkEmailDuplicate,
   signUpUser,
   getAccountsByEmail,
-  
+
   // 인증
   loginUser,
   logoutUser,
-  
+
   // 프로필 관련
   getMyProfile,
   updateMyProfile,
   changePassword,
   withdrawUser,
-  
+
   // 비밀번호 찾기
   resetPassword,
 
@@ -271,5 +271,5 @@ export default {
   getCurrentUser,
 
   // Access Token 갱신
-  refreshToken 
+  refreshToken,
 }

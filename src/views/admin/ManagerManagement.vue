@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import AdminLayout from '@/components/AdminLayout.vue'
 import PageNation from '@/components/PageNation.vue'
 import adminApi from '@/services/admin/admin_api'
@@ -15,7 +15,7 @@ const managers = ref([])
 /** 페이징 정보 */
 const currentPage = ref(1) // 1-based로 변경 (프론트 표시용)
 const totalPages = ref(0) // 백엔드 totalPages (사용 안 함)
-const pageSize = ref(10)
+const pageSize = ref(15)
 const totalElements = ref(0) // 전체 아이템 수
 
 /** 로딩 상태 */
@@ -321,6 +321,10 @@ const formatDate = (dateString) => {
 
 onMounted(() => {
   fetchManagers()
+})
+
+watch(currentPage, (newPage) => {
+  fetchManagers(newPage)
 })
 </script>
 

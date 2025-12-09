@@ -5,7 +5,6 @@ import { onMounted, ref, watch } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 import dashboardApi from '@/services/dashboard/dashboard_api'
 
-
 /** 기본 설정 */
 const route = useRoute()
 
@@ -13,14 +12,13 @@ const headerItems = ref([
   { label: '총 서비스 수', key: 'resourceCount' },
   { label: '누적 예약 수', key: 'cumReservationCount' },
   { label: '누적 취소 수', key: 'cumCancleCount' },
-  { label: '이용자 수', key: 'useCustomerCount', subKey: 'totalCustomerCount' }
+  { label: '이용자 수', key: 'useCustomerCount', subKey: 'totalCustomerCount' },
 ])
 
 /** 대시보드 데이터 */
 const dashboardData = ref({})
 
-
-/** 
+/**
  * 성별 사용자 차트 */
 const genderChartOptions = ref({
   chart: { type: 'donut', height: 200 },
@@ -32,89 +30,103 @@ const genderChartOptions = ref({
     pie: {
       donut: {
         size: '65%',
-        labels: {
-          show: false
-        }
-      }
-    }
+        labels: { show: false },
+      },
+    },
   },
 })
-const genderSeries = ref([68, 68])
+const genderSeries = ref([0, 0])
 
-/** 
+// 성별 통계 데이터 적용
+const applyGenderStats = () => {
+  const stats = dashboardData.value.genderStats
+  if (stats) {
+    genderSeries.value = [stats.femaleCount, stats.maleCount]
+  }
+}
+
+/**
  * 연령대별 사용자 차트 */
 const ageChartOptions = ref({
   chart: { type: 'donut', height: 200 },
-  labels: ['10대', '20대'],
-  colors: ['#5B8FF9', '#BDD7FF'],
+  labels: [],
+  colors: ['#5B8FF9', '#BDD7FF', '#7EC8E3', '#9FD5D1', '#C4E3CB', '#E8D5B7'],
   legend: { show: false },
   dataLabels: { enabled: false },
   plotOptions: {
     pie: {
       donut: {
         size: '65%',
-        labels: {
-          show: false
-        }
-      }
-    }
+        labels: { show: false },
+      },
+    },
   },
 })
+const ageSeries = ref([])
 
-const ageSeries = ref([30, 68])
+// 연령대 통계 데이터 적용
+const applyAgeStats = () => {
+  const stats = dashboardData.value.ageGroupStats
+  if (stats && stats.length > 0) {
+    // 0이 아닌 데이터만 필터링
+    const filtered = stats.filter((s) => s.count > 0)
+    ageChartOptions.value = {
+      ...ageChartOptions.value,
+      labels: filtered.map((s) => s.ageGroup),
+    }
+    ageSeries.value = filtered.map((s) => s.count)
+  }
+}
 
-/** 
+/**
  * 조회수 증감률 */
 const calcChangePercent = (today, yesterday) => {
   if (yesterday === 0) {
     if (today === 0) return 0
     return 100
   }
-  return Math.round(((today - yesterday) / yesterday) * 100 * 10) / 10;
+  return Math.round(((today - yesterday) / yesterday) * 100 * 10) / 10
 }
 
-
 /**
-* 시간대별 예약 현황 차트 */
+ * 시간대별 예약 현황 차트 */
 const timeSlotChartOptions = ref({
   chart: { type: 'bar', height: 280, toolbar: { show: false } },
   plotOptions: {
     bar: {
       horizontal: false,
       columnWidth: '10%',
-      borderRadius: 4
-    }
+      borderRadius: 4,
+    },
   },
   dataLabels: { enabled: false },
   stroke: { show: true, width: 2, colors: ['transparent'] },
   xaxis: {
-    categories: []
+    categories: [],
   },
   yaxis: { title: { text: '예약 건수' } },
   fill: { opacity: 1 },
   colors: ['#5B8FF9'],
-  grid: { borderColor: '#E5E7EB' }
+  grid: { borderColor: '#E5E7EB' },
 })
 
-const timeSlotSeries = ref([
-  { name: '예약 건수', data: [] }
-])
+const timeSlotSeries = ref([{ name: '예약 건수', data: [] }])
 
 // 막대 너비 설정
 const calculateColumnWidth = (count) => {
-  if (count <= 3) return '10%'       // 아주 적음 (얇게)
-  if (count <= 6) return '20%'       // 적음
-  if (count <= 10) return '30%'      // 중간
-  if (count <= 15) return '40%'      // 많음
-  return '50%'                       // 매우 많음 (넓게)
+  if (count <= 3) return '10%' // 아주 적음 (얇게)
+  if (count <= 6) return '20%' // 적음
+  if (count <= 10) return '30%' // 중간
+  if (count <= 15) return '40%' // 많음
+  return '50%' // 매우 많음 (넓게)
 }
 
 // 시간별 예약 수 데이터 설정
 const applyReservaionHourlyDate = () => {
   const list = dashboardData.value.houlryReservationCounts || []
 
-  const categories = list.map(i => `${i.hour}시`)
-  const values = list.map(i => i.count)
+  const categories = list.map((i) => `${i.hour}시`)
+  const values = list.map((i) => i.count)
   const columnWidth = calculateColumnWidth(categories.length)
 
   timeSlotChartOptions.value = {
@@ -123,22 +135,19 @@ const applyReservaionHourlyDate = () => {
       ...timeSlotChartOptions.value.plotOptions,
       bar: {
         ...timeSlotChartOptions.value.plotOptions.bar,
-        columnWidth: columnWidth
-      }
+        columnWidth: columnWidth,
+      },
     },
     xaxis: {
       ...timeSlotChartOptions.value.xaxis,
-      categories
-    }
+      categories,
+    },
   }
 
-  timeSlotSeries.value = [
-    { name: '예약 건수', data: values }
-  ]
+  timeSlotSeries.value = [{ name: '예약 건수', data: values }]
 }
 
-
-/** 
+/**
  * 시간 추이별 차트 */
 const timeTrendChartOptions = ref({
   chart: { type: 'line', height: 250, toolbar: { show: false } },
@@ -148,7 +157,7 @@ const timeTrendChartOptions = ref({
   yaxis: { min: 0, max: 100 },
   dataLabels: { enabled: false },
   grid: { borderColor: '#E5E7EB' },
-  markers: { size: 4 }
+  markers: { size: 4 },
 })
 
 const timeTrendSeries = ref([{ name: '조회 수', data: [] }])
@@ -161,38 +170,57 @@ const applyViewHourlyData = () => {
     ...timeTrendChartOptions.value,
     xaxis: {
       ...timeTrendChartOptions.value.xaxis,
-      categories: list.map(i => `${i.hour}시`)
-    }
+      categories: list.map((i) => `${i.hour}시`),
+    },
   }
 
-  timeTrendSeries.value = [
-    { name: '조회 수', data: list.map(i => i.viewCount) }
-  ]
+  timeTrendSeries.value = [{ name: '조회 수', data: list.map((i) => i.viewCount) }]
 }
-
 
 // 리소스 그룹별 대시보드 API 호출
 const getServiceGroupDashboardData = async () => {
-  const response = await dashboardApi.getAdminResourceGroupDashboardData(route.params.serviceGroupId)
+  const response = await dashboardApi.getAdminResourceGroupDashboardData(
+    route.params.serviceGroupId,
+  )
   dashboardData.value = response.data
 }
 
 // 다른 리소스 그룹 선택 했을 시 라우터 감시
 watch(
   () => route.path,
-  () => getServiceGroupDashboardData()
+  () => getServiceGroupDashboardData(),
 )
 
 // 시간별 조회수 데이터 감지
 watch(
   () => dashboardData.value.hourlyViewCounts,
-  () => { applyViewHourlyData() }
+  () => {
+    applyViewHourlyData()
+  },
 )
 
 // 시간별 예약수 데이터 감지
 watch(
   () => dashboardData.value.houlryReservationCounts,
-  () => { applyReservaionHourlyDate() }
+  () => {
+    applyReservaionHourlyDate()
+  },
+)
+
+// 성별 통계 데이터 감지
+watch(
+  () => dashboardData.value.genderStats,
+  () => {
+    applyGenderStats()
+  },
+)
+
+// 연령대 통계 데이터 감지
+watch(
+  () => dashboardData.value.ageGroupStats,
+  () => {
+    applyAgeStats()
+  },
 )
 
 // 화면 로드시 api 호출 및 데이터 설정
@@ -209,7 +237,9 @@ onMounted(() => {
         <div v-for="item in headerItems" class="kpi-card" :key="item.key">
           <p class="kpi-label">{{ item.label }}</p>
           <!-- 서브 값이 있는 경우 -->
-          <p class="kpi-value" v-if="item.subKey">{{ dashboardData[item.key] }} / {{ dashboardData[item.subKey] }}</p>
+          <p class="kpi-value" v-if="item.subKey">
+            {{ dashboardData[item.key] }} / {{ dashboardData[item.subKey] }}
+          </p>
           <!-- 일반 값 -->
           <p class="kpi-value" v-else>{{ dashboardData[item.key] }}</p>
         </div>
@@ -221,7 +251,11 @@ onMounted(() => {
         <div class="card service-performance-card">
           <h3 class="card-title">서비스별 성과 (한달 기준)</h3>
           <div class="performance-list">
-            <div v-for="service in dashboardData.performanceByResources" :key="service.resourceName" class="performance-item">
+            <div
+              v-for="service in dashboardData.performanceByResources"
+              :key="service.resourceName"
+              class="performance-item"
+            >
               <div class="performance-header">
                 <span class="service-name">{{ service.resourceName }}</span>
                 <span class="service-percent">{{ Math.round(service.count) }}%</span>
@@ -247,12 +281,12 @@ onMounted(() => {
               />
               <div class="chart-legend">
                 <div class="legend-item">
-                  <span class="legend-dot" style="background: #5B8FF9"></span>
-                  <span>여성 68%</span>
+                  <span class="legend-dot" style="background: #5b8ff9"></span>
+                  <span>여성 {{ dashboardData.genderStats?.femalePercent || 0 }}%</span>
                 </div>
                 <div class="legend-item">
-                  <span class="legend-dot" style="background: #BDD7FF"></span>
-                  <span>남성 68%</span>
+                  <span class="legend-dot" style="background: #ff6b9d"></span>
+                  <span>남성 {{ dashboardData.genderStats?.malePercent || 0 }}%</span>
                 </div>
               </div>
             </div>
@@ -266,14 +300,29 @@ onMounted(() => {
                 :series="ageSeries"
               />
               <div class="chart-legend">
-                <div class="legend-item">
-                  <span class="legend-dot" style="background: #5B8FF9"></span>
-                  <span>10대 30%</span>
-                </div>
-                <div class="legend-item">
-                  <span class="legend-dot" style="background: #BDD7FF"></span>
-                  <span>20대 68%</span>
-                </div>
+                <template
+                  v-for="(stat, index) in (dashboardData.ageGroupStats || []).filter(
+                    (s) => s.count > 0,
+                  )"
+                  :key="stat.ageGroup"
+                >
+                  <div class="legend-item">
+                    <span
+                      class="legend-dot"
+                      :style="{
+                        background: [
+                          '#5B8FF9',
+                          '#BDD7FF',
+                          '#7EC8E3',
+                          '#9FD5D1',
+                          '#C4E3CB',
+                          '#E8D5B7',
+                        ][index],
+                      }"
+                    ></span>
+                    <span>{{ stat.ageGroup }} {{ stat.percent }}%</span>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -283,11 +332,24 @@ onMounted(() => {
         <div class="card view-count-card">
           <h3 class="card-title">오늘 조회 수</h3>
           <div class="view-stats">
-            <div class="view-number">{{ dashboardData.todayViewCount }}<span class="unit">명</span></div>
+            <div class="view-number">
+              {{ dashboardData.todayViewCount }}<span class="unit">명</span>
+            </div>
             <div class="view-change">
               <span>전일 대비</span>
-              <span :class="calcChangePercent(dashboardData.todayViewCount, dashboardData.yesterDayViewCount) >= 0 ? 'positive' : 'negative'">
-                {{ calcChangePercent(dashboardData.todayViewCount, dashboardData.yesterDayViewCount) }}%
+              <span
+                :class="
+                  calcChangePercent(
+                    dashboardData.todayViewCount,
+                    dashboardData.yesterDayViewCount,
+                  ) >= 0
+                    ? 'positive'
+                    : 'negative'
+                "
+              >
+                {{
+                  calcChangePercent(dashboardData.todayViewCount, dashboardData.yesterDayViewCount)
+                }}%
               </span>
             </div>
           </div>
@@ -357,7 +419,7 @@ onMounted(() => {
   @apply grid grid-cols-6 gap-4 mb-6;
 }
 
-.middle-section .card{
+.middle-section .card {
   @apply h-[400px];
 }
 
@@ -657,6 +719,4 @@ onMounted(() => {
 .mini-line-chart {
   @apply w-full h-12 mt-4;
 }
-
 </style>
-
