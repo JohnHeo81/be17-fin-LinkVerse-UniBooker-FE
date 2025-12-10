@@ -1,6 +1,6 @@
 <script setup>
 // ================= import ==================
-import { watch, onMounted, reactive, ref, computed } from 'vue'
+import { watch, onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useAuthStore } from '@/stores/UseStore'
 
@@ -12,11 +12,21 @@ import SeatBoard from '@/components/SeatBoard.vue'
 
 import ServiceApi from '@/services/user/service_api'
 import ReservationApi from '@/services/reservation/reservation_api'
+import HoldApi from '@/services/reservation/hold_api'
+
+import {
+  connectWebSocket,
+  disconnectWebSocket,
+  subscribe,
+  unsubscribe,
+  isConnected,
+} from '@/utils/webSocket'
 
 // =============== definition ================
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const resourceId = ref(null)
 
 const today = new Date()
 const todayStr = today.toISOString().slice(0, 10) // yyyy-mm-dd
@@ -54,6 +64,22 @@ const reservationForm = computed(() => ({
   col: selectedCol.value,
   customFieldValues: userCustomFieldValuesForm,
 }))
+
+// =============== 입장 토큰 타이머 ================
+const ENTER_TOKEN_TTL = 180 // 30초
+let remainingSeconds = ENTER_TOKEN_TTL
+let countdownTimer = null
+let holdTimer = null
+
+// =============== Hold 상태 ================
+const currentHold = reactive({
+  date: null,
+  time: null,
+  row: null,
+  col: null,
+})
+const holdList = ref([]) // 현재 날짜의 Hold 목록
+let holdSubscription = null // WebSocket 구독
 
 // ================== api 요청 ==================
 // --- 리소스 상세 조회
@@ -153,16 +179,312 @@ const getResourceReservations = async (startDate, endDate) => {
 // --- 예약 요청
 const reserve = async () => {
   const confirmed = window.confirm('예약을 하시겠습니까?')
-  if (!confirmed) return // 취소
+  if (!confirmed) return
 
-  const response = await ReservationApi.reserve(route.params.itemId, reservationForm.value)
+  try {
+    const response = await ReservationApi.reserve(route.params.itemId, reservationForm.value)
 
-  if (response.isSuccess) {
-    const slug = route.params.companySlug || authStore.companySlug || 'default'
-    router.push(`/c/${slug}/reservation/completed/${response.data.id}`)
-  } else {
-    alert('예약 실패')
+    if (response && response.isSuccess) {
+      const slug = route.params.companySlug || authStore.companySlug || 'default'
+      router.push(`/c/${slug}/reservation/completed/${response.data.id}`)
+    } else {
+      // 백엔드 에러 메시지 표시
+      const errorMessage = response?.message || '예약에 실패했습니다.'
+      alert(errorMessage)
+    }
+  } catch (error) {
+    console.error('[Reserve] 예약 실패:', error)
+
+    // 백엔드 응답에서 에러 메시지 추출
+    const errorMessage = error.response?.data?.message || '예약 처리 중 오류가 발생했습니다.'
+    alert(errorMessage)
   }
+}
+
+// =============== Hold API ================
+/** Hold 생성 (시간/좌석 선택 시) */
+const createHold = async (date, time, row = null, col = null) => {
+  try {
+    const response = await HoldApi.createHold(resourceId.value, {
+      date,
+      time,
+      row,
+      col,
+      ttl: remainingSeconds, // 남은 페이지 TTL 전달
+    })
+
+    if (response.success) {
+      currentHold.date = date
+      currentHold.time = time
+      currentHold.row = row
+      currentHold.col = col
+
+      // Hold 타이머는 페이지 TTL과 동기화되므로 별도 타이머 불필요
+      // startHoldTimer 제거 또는 유지 (선택)
+
+      return true
+    } else {
+      alert(response.message)
+      return false
+    }
+  } catch (error) {
+    console.error('[Hold] 생성 실패:', error)
+    alert('선택에 실패했습니다. 다시 시도해주세요.')
+    return false
+  }
+}
+
+/** Hold 해제 (선택 취소 시) */
+const releaseHold = async () => {
+  if (!currentHold.date || !currentHold.time) return
+  if (!resourceId.value) return // 추가
+
+  try {
+    await HoldApi.releaseHold(resourceId.value, {
+      date: currentHold.date,
+      time: currentHold.time,
+      row: currentHold.row,
+      col: currentHold.col,
+    })
+
+    // Hold 상태 초기화
+    currentHold.date = null
+    currentHold.time = null
+    currentHold.row = null
+    currentHold.col = null
+  } catch (error) {
+    console.error('[Hold] 해제 실패:', error)
+  }
+}
+
+/** Hold 상태 조회 */
+const fetchHoldStatus = async () => {
+  try {
+    const response = await HoldApi.getHoldStatus(resourceId.value, selectedDate.value)
+    holdList.value = response.holds || []
+  } catch (error) {
+    console.error('[Hold] 상태 조회 실패:', error)
+  }
+}
+
+/** 시간대가 Hold 되어있는지 확인 (RESERVATION 카테고리 전용) */
+const isTimeHeld = (time) => {
+  // SEAT 카테고리는 시간 Hold가 없음 (좌석 Hold만 존재)
+  if (service.category === 'SEAT') {
+    return false
+  }
+
+  // RESERVATION 카테고리: row/col이 null인 Hold만 확인
+  return holdList.value.some(
+    (hold) => hold.time === time && hold.row === null && hold.col === null && !isMyHold(hold),
+  )
+}
+
+/** 좌석이 Hold 되어있는지 확인 */
+const isSeatHeld = (row, col) => {
+  return holdList.value.some((hold) => hold.row === row && hold.col === col && !isMyHold(hold))
+}
+
+/** 내 Hold인지 확인 */
+const isMyHold = (hold) => {
+  return (
+    currentHold.date === hold.date &&
+    currentHold.time === hold.time &&
+    currentHold.row === hold.row &&
+    currentHold.col === hold.col
+  )
+}
+
+/** 시간 선택 핸들러 */
+const handleTimeSelect = async (time) => {
+  // 이미 마감된 시간 체크
+  if (isTimeClosed(time)) return
+
+  // === SEAT 카테고리: Hold 없이 시간만 선택 ===
+  if (service.category === 'SEAT') {
+    selectedTime.value = time
+    return
+  }
+
+  // === RESERVATION 카테고리: 시간 선택 시 Hold 생성 ===
+  // 다른 사용자가 Hold 중인지 체크
+  if (isTimeHeld(time)) {
+    alert('해당 시간은 다른 사용자가 선택 중입니다.')
+    return
+  }
+
+  // 이전 Hold 해제
+  if (currentHold.time && currentHold.time !== time) {
+    await releaseHold()
+  }
+
+  // Hold 생성
+  const success = await createHold(selectedDate.value, time)
+  if (success) {
+    selectedTime.value = time
+  }
+}
+
+/** Hold 타이머 시작 */
+const startHoldTimer = (seconds) => {
+  // 기존 타이머 정리
+  if (holdTimer) {
+    clearTimeout(holdTimer)
+  }
+
+  holdTimer = setTimeout(() => {
+    // Hold 만료 처리
+    alert('선택 시간이 만료되었습니다. 다시 선택해주세요.')
+
+    // 선택 상태 초기화
+    selectedTime.value = null
+    currentHold.date = null
+    currentHold.time = null
+    currentHold.row = null
+    currentHold.col = null
+
+    // Hold 상태 재조회 (다른 사용자 Hold 반영)
+    fetchHoldStatus()
+  }, seconds * 1000)
+}
+
+/** Hold 타이머 정리 */
+const clearHoldTimer = () => {
+  if (holdTimer) {
+    clearTimeout(holdTimer)
+    holdTimer = null
+  }
+}
+
+/** 새로고침/탭 닫기 시 Hold 해제 (sendBeacon 사용) */
+const handleBeforeUnload = () => {
+  if (!currentHold.date || !currentHold.time || !resourceId.value) return
+
+  // sendBeacon으로 동기적 API 호출 (새로고침에도 작동)
+  const url = `${import.meta.env.VITE_API_BASE_URL}/api/hold/${resourceId.value}/release`
+  const data = JSON.stringify({
+    date: currentHold.date,
+    time: currentHold.time,
+    row: currentHold.row,
+    col: currentHold.col,
+  })
+
+  navigator.sendBeacon(url, new Blob([data], { type: 'application/json' }))
+  console.log('[Hold] beforeunload → sendBeacon 호출')
+}
+
+// =============== WebSocket ================
+/** WebSocket 연결 및 Hold 토픽 구독 */
+const connectHoldWebSocket = async () => {
+  try {
+    // 이미 연결되어 있지 않으면 연결 (await 필수)
+    if (!isConnected()) {
+      await connectWebSocket()
+    }
+
+    // 연결 완료 대기 (약간의 딜레이)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // Hold 토픽 구독
+    const topic = `/topic/hold/${resourceId.value}`
+    holdSubscription = subscribe(topic, handleHoldMessage)
+    console.log('🔌 Hold 토픽 구독:', topic)
+  } catch (error) {
+    console.error('[Hold WebSocket] 연결 실패:', error)
+  }
+}
+
+/** WebSocket 메시지 처리 */
+const handleHoldMessage = (message) => {
+  console.log('[Hold WebSocket] 메시지 수신:', message)
+
+  // 현재 선택한 날짜와 다르면 무시
+  if (message.date !== selectedDate.value) return
+
+  switch (message.type) {
+    case 'HOLD_CREATED':
+      addHoldToList(message)
+      break
+
+    case 'HOLD_RELEASED':
+      removeHoldFromList(message)
+      break
+
+    case 'RESERVATION_COMPLETED':
+      removeHoldFromList(message)
+      refreshReservations()
+      break
+  }
+}
+
+/** Hold 목록에 추가 (새 배열 할당으로 반응성 보장) */
+const addHoldToList = (message) => {
+  const exists = holdList.value.some(
+    (h) => h.time === message.time && h.row === message.row && h.col === message.col,
+  )
+  if (!exists) {
+    // 새 배열 할당 (Vue 반응성 트리거)
+    holdList.value = [
+      ...holdList.value,
+      {
+        date: message.date,
+        time: message.time,
+        row: message.row,
+        col: message.col,
+      },
+    ]
+  }
+}
+
+/** Hold 목록에서 제거 */
+const removeHoldFromList = (message) => {
+  holdList.value = holdList.value.filter(
+    (h) => !(h.time === message.time && h.row === message.row && h.col === message.col),
+  )
+}
+
+/** 예약 목록 갱신 */
+const refreshReservations = () => {
+  getResourceReservations(
+    toLocalDateTimeStart(selectedDate.value),
+    toLocalDateTimeEnd(selectedDate.value),
+  )
+}
+
+/** Hold 토픽 구독 해제 */
+const disconnectHoldWebSocket = () => {
+  if (holdSubscription) {
+    unsubscribe(holdSubscription)
+    holdSubscription = null
+  }
+}
+
+// =============== 입장 토큰 타이머 ================
+/** 카운트다운 시작 */
+const startCountdown = () => {
+  countdownTimer = setInterval(async () => {
+    remainingSeconds--
+
+    if (remainingSeconds <= 0) {
+      clearInterval(countdownTimer)
+      await handleTokenExpired()
+    }
+  }, 1000)
+}
+
+/** 토큰 만료 처리 */
+const handleTokenExpired = async () => {
+  // Hold 타이머 정리
+  clearHoldTimer()
+
+  // Hold 해제 (Redis에서 삭제)
+  await releaseHold()
+
+  alert('예약 시간이 만료되었습니다. 다시 대기열에 참여해주세요.')
+
+  const serviceGroupId = route.params.serviceGroupId
+  const companySlug = route.params.companySlug
+  router.replace(`/c/${companySlug}/services/${serviceGroupId}`)
 }
 
 // ================ function ==================
@@ -223,7 +545,7 @@ const updateAvailableTimes = (date) => {
 }
 
 // --- 선택한 날짜가 바뀔 때마다 요일별 시간 재계산 및 날짜가 바뀌면 선택 값들도 초기화
-watch(selectedDate, () => {
+watch(selectedDate, async () => {
   selectedTime.value = null
   selectedRow.value = null
   selectedCol.value = null
@@ -255,11 +577,22 @@ watch(selectedDate, () => {
     endTime: slot.endTime,
   }))
 
-  // 특정 리소스에 예약된 목록 조회
-  getResourceReservations(
+  // 특정 리소스에 예약된 목록 조회 (await 추가)
+  await getResourceReservations(
     toLocalDateTimeStart(selectedDate.value),
     toLocalDateTimeEnd(selectedDate.value),
   )
+
+  // Hold 상태 조회 (await 추가)
+  await fetchHoldStatus()
+
+  // 시간대가 1개일 때 자동 선택 (await 추가 + isTimeHeld 체크)
+  if (availableTimes.value.length === 1) {
+    const singleTime = availableTimes.value[0].startTime
+    if (!isTimeClosed(singleTime) && !isTimeHeld(singleTime)) {
+      await handleTimeSelect(singleTime)
+    }
+  }
 })
 
 // -- 선택한 시간이 변경되면 선택 값들 초기화
@@ -304,10 +637,54 @@ const decrease = () => {
   if (selectedHeadCount.value > 1) selectedHeadCount.value -= 1
 }
 
-// --- 좌석 선택
-const selectSeat = ({ row, col }) => {
-  selectedRow.value = row
-  selectedCol.value = col
+// --- 좌석 선택 (Optimistic UI + Hold 생성)
+const selectSeat = async ({ row, col }) => {
+  // 다른 사용자가 Hold 중인지 체크
+  if (isSeatHeld(row, col)) {
+    alert('해당 좌석은 다른 사용자가 선택 중입니다.')
+    return
+  }
+
+  // 이미 예약된 좌석인지 체크
+  const isReserved = resourceReservations.value.some(
+    (r) => r.startDate.slice(11, 16) === selectedTime.value && r.row === row && r.col === col,
+  )
+  if (isReserved) {
+    alert('이미 예약된 좌석입니다.')
+    return
+  }
+
+  // 이전 Hold 해제 (다른 좌석 선택했을 때)
+  if (currentHold.row !== null && (currentHold.row !== row || currentHold.col !== col)) {
+    // 이전 Hold를 holdList에서 제거
+    holdList.value = holdList.value.filter(
+      (h) =>
+        !(h.time === currentHold.time && h.row === currentHold.row && h.col === currentHold.col),
+    )
+    await releaseHold()
+  }
+
+  // === Optimistic UI: 클릭 즉시 holdList에 추가 (노란색 표시) ===
+  const optimisticHold = {
+    date: selectedDate.value,
+    time: selectedTime.value,
+    row: row,
+    col: col,
+  }
+  holdList.value = [...holdList.value, optimisticHold]
+
+  // Hold 생성 API 호출
+  const success = await createHold(selectedDate.value, selectedTime.value, row, col)
+
+  if (success) {
+    selectedRow.value = row
+    selectedCol.value = col
+  } else {
+    // === 실패 시 롤백: holdList에서 제거 ===
+    holdList.value = holdList.value.filter(
+      (h) => !(h.time === selectedTime.value && h.row === row && h.col === col),
+    )
+  }
 }
 
 // --- 선택 불가능한 날짜 계산
@@ -358,14 +735,74 @@ const onCheckboxChange = (index, option, checked) => {
 }
 
 // =============== 화면 로드시 데이터 조회 ===============
-onMounted(() => {
+onMounted(async () => {
+  // === 새로고침 감지 (진입 토큰 검증) ===
+  const entryToken = sessionStorage.getItem('entryToken')
+  const storedResourceId = sessionStorage.getItem('entryResourceId')
+
+  // 정상 진입이 아니면 서비스 목록으로 이동
+  if (!entryToken || storedResourceId !== route.params.itemId) {
+    console.log('[ServiceDetail] 비정상 진입 감지 → 서비스 목록으로 이동')
+    const serviceGroupId = route.params.serviceGroupId
+    const companySlug = route.params.companySlug
+    router.replace(`/c/${companySlug}/services/${serviceGroupId}`)
+    return
+  }
+
+  // 진입 토큰 삭제 (재사용 방지)
+  sessionStorage.removeItem('entryToken')
+  sessionStorage.removeItem('entryResourceId')
+
+  // 진입 시 경고 알림
+  alert('⚠️ 새로고침 또는 뒤로가기 시 다시 대기열에 참여해야 합니다.')
+
+  // resourceId 저장 (페이지 이탈 시에도 사용 가능)
+  resourceId.value = route.params.itemId
+
+  // === 새로고침/탭 닫기 시 Hold 해제 이벤트 등록 ===
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
+  // 1) Hold WebSocket 먼저 연결 (await)
+  await connectHoldWebSocket()
+
+  // 2) 데이터 로드
   getService()
   getResourceCustomFieldValues()
   getUserCustomFields()
   getTimeSlots()
   getExceptionTimeSlots()
-  getYearMonthTimeSlots(route.params.itemId, today.getFullYear(), today.getMonth() + 1)
-  getResourceReservations(toLocalDateTimeStart(todayStr), toLocalDateTimeEnd(todayStr))
+  await getYearMonthTimeSlots(route.params.itemId, today.getFullYear(), today.getMonth() + 1)
+  await getResourceReservations(toLocalDateTimeStart(todayStr), toLocalDateTimeEnd(todayStr))
+
+  // 3) 입장 토큰 타이머 시작
+  startCountdown()
+
+  // 4) Hold 상태 조회 및 시간대 자동선택 (초기 로드 시)
+  await fetchHoldStatus()
+
+  // 시간대가 1개일 때 자동 선택
+  if (availableTimes.value.length === 1) {
+    const singleTime = availableTimes.value[0].startTime
+    if (!isTimeClosed(singleTime)) {
+      await handleTimeSelect(singleTime)
+    }
+  }
+})
+
+// 컴포넌트 언마운트 시 정리
+onBeforeUnmount(() => {
+  // 입장 토큰 타이머 정리
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
+  // Hold 타이머 정리
+  clearHoldTimer()
+  // 페이지 이탈 시 Hold 해제
+  releaseHold()
+  // Hold WebSocket 구독 해제
+  disconnectHoldWebSocket()
+  // beforeunload 이벤트 리스너 제거
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 
 // 뒤로가기/페이지 이탈 시 서비스 목록으로 이동
@@ -400,6 +837,8 @@ onBeforeRouteLeave((to, from, next) => {
         :service="service"
         :selectedTime="selectedTime"
         :resourceReservations="resourceReservations"
+        :holdList="holdList"
+        :currentHold="currentHold"
         @selectSeat="selectSeat"
       />
       <div class="p-6">
@@ -487,12 +926,16 @@ onBeforeRouteLeave((to, from, next) => {
             <button
               v-for="(time, index) in availableTimes"
               :key="index"
-              :disabled="isTimeClosed(time.startTime)"
+              :disabled="isTimeClosed(time.startTime) || isTimeHeld(time.startTime)"
               :class="[
                 'time-btn',
-                { active: selectedTime === time.startTime, block: isTimeClosed(time.startTime) },
+                {
+                  active: selectedTime === time.startTime,
+                  block: isTimeClosed(time.startTime),
+                  held: isTimeHeld(time.startTime),
+                },
               ]"
-              @click="!isTimeClosed(time.startTime) && (selectedTime = time.startTime)"
+              @click="handleTimeSelect(time.startTime)"
             >
               {{ time.startTime }}
             </button>
@@ -511,11 +954,25 @@ onBeforeRouteLeave((to, from, next) => {
 
         <div v-if="service.category === 'SEAT' && availableTimes.length" class="form-group">
           <label>좌석 선택</label>
-          <div class="flex flex-row justify-between gap-3 text-sm text-gray-500">
-            <span>선택한 좌석</span>
-            <span @click="showSeatModal = true">{{
-              selectedRow && selectedCol ? selectedRow + '행 ' + selectedCol + '열' : '없음'
-            }}</span>
+          <div class="flex flex-row justify-between items-center gap-3">
+            <span class="text-sm text-gray-500">
+              {{
+                selectedRow && selectedCol ? selectedRow + '행 ' + selectedCol + '열' : '선택 안됨'
+              }}
+            </span>
+            <button
+              type="button"
+              @click="selectedTime ? (showSeatModal = true) : alert('시간을 먼저 선택해주세요.')"
+              :disabled="!selectedTime"
+              :class="[
+                'px-4 py-2 text-sm rounded-md transition',
+                selectedTime
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+              ]"
+            >
+              좌석 선택
+            </button>
           </div>
         </div>
 
@@ -698,6 +1155,10 @@ onBeforeRouteLeave((to, from, next) => {
 
 .time-btn.block {
   @apply opacity-50 cursor-not-allowed bg-gray-200 text-gray-500 border-gray-300;
+}
+
+.time-btn.held {
+  @apply opacity-50 cursor-not-allowed bg-yellow-100 text-yellow-700 border-yellow-300;
 }
 
 /* 인원수 */

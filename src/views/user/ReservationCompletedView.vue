@@ -3,6 +3,7 @@ import { onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ReservationApi from '@/services/reservation/reservation_api'
 import QueueApi from '@/services/reservation/queue_api'
+import Button from '@/components/Button.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,6 +59,18 @@ const consumeQueueToken = async () => {
 const getReservation = async () => {
   const response = await ReservationApi.getServiceReservationDetail(route.params.reservationId)
   Object.assign(reservationData, response)
+}
+
+/** 예약 상세 페이지로 이동 */
+const goToReservationDetail = () => {
+  const companySlug = route.params.companySlug
+  router.push(`/c/${companySlug}/reservation/detail/${route.params.reservationId}`)
+}
+
+/** 홈(서비스 목록)으로 이동 */
+const goToHome = () => {
+  const companySlug = route.params.companySlug
+  router.push(`/c/${companySlug}/services`)
 }
 
 onMounted(() => {

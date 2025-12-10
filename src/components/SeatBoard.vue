@@ -2,7 +2,13 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
-const props = defineProps({ service: Object, selectedTime: String, resourceReservations: Array })
+const props = defineProps({
+  service: Object,
+  selectedTime: String,
+  resourceReservations: Array,
+  holdList: Array,
+  currentHold: Object, // 본인 Hold 정보 추가
+})
 const emits = defineEmits(['selectSeat'])
 
 const route = useRoute()
@@ -23,39 +29,62 @@ const hoverSeat = ref(null)
 // 🌟 현재 선택한 시간대에 해당하는 예약 정보만 필터링
 const currentTimeReservations = computed(() => {
   if (!props.selectedTime || !props.resourceReservations) return []
-  return props.resourceReservations.filter((r) =>
-    r.startDate.slice(11, 16) === props.selectedTime
-  )
+  return props.resourceReservations.filter((r) => r.startDate.slice(11, 16) === props.selectedTime)
 })
+
+// 🌟 현재 선택한 시간대에 해당하는 Hold 정보만 필터링
+const currentTimeHolds = computed(() => {
+  if (!props.selectedTime || !props.holdList) return []
+  return props.holdList.filter((h) => h.time === props.selectedTime)
+})
+
+// 좌석이 Hold 되어있는지 확인
+const isSeatHeld = (row, col) => {
+  return currentTimeHolds.value.some((h) => h.row === row && h.col === col)
+}
 
 // 좌석 데이터 생성
 const generateSeats = () => {
   return Array.from({ length: rows }, (_, r) =>
     Array.from({ length: cols }, (_, c) => {
+      const rowNum = r + 1
+      const colNum = c + 1
 
       // 선택된 시간과 일치하는 예약만 필터링
-      const reservedSeat = currentTimeReservations.value.find((item) =>
-        item.row === r + 1 && item.col === c + 1
+      const reservedSeat = currentTimeReservations.value.find(
+        (item) => item.row === rowNum && item.col === colNum,
       )
 
+      // Hold 여부 확인
+      const isHeld = isSeatHeld(rowNum, colNum)
+
+      // 본인 Hold 여부 확인
+      const isMyHold =
+        props.currentHold &&
+        props.currentHold.time === props.selectedTime &&
+        props.currentHold.row === rowNum &&
+        props.currentHold.col === colNum
+
       return {
-        id: route.params.itemId * 10000 + r * cols + c, // 좌석 id
-        row: r + 1,
-        col: c + 1,
-        reserved: !!reservedSeat,           // 예약 여부
-        reservationInfo: reservedSeat       // 예약된 경우의 예약 상세 정보
+        id: route.params.itemId * 10000 + r * cols + c,
+        row: rowNum,
+        col: colNum,
+        reserved: !!reservedSeat,
+        held: isHeld,
+        myHold: isMyHold, // 본인 Hold 여부 추가
+        reservationInfo: reservedSeat
           ? {
-            id: reservedSeat.id,            // 예약 번호
-            name: reservedSeat.userName,    // 좌석을 예약한 사용자 
-            date: reservedSeat.startDate,   // 예약 날짜
-            time: reservedSeat.endDate,     // 예약 시간
-          }
+              id: reservedSeat.id,
+              name: reservedSeat.userName,
+              date: reservedSeat.startDate,
+              time: reservedSeat.endDate,
+            }
           : null,
       }
     }),
   )
 }
-  
+
 // 좌석 호버시 처리
 const onSeatHoverBoard = (seat) => {
   hoverSeat.value = seat
@@ -63,36 +92,55 @@ const onSeatHoverBoard = (seat) => {
 
 // 좌석 선택 시 부모 컴포넌트에 값 전달
 const sendParentSeatInfo = (seat) => {
-  selectedSeat.value = seat // 선택한 좌석 저장
+  // 예약된 좌석은 선택 불가
+  if (seat.reserved) {
+    return
+  }
+  // Hold된 좌석은 선택 불가 (부모에서 처리하지만 UI에서도 막기)
+  if (seat.held) {
+    return
+  }
+
+  // selectedSeat.value = seat 삭제 (Hold 생성 후 WebSocket으로 색상 반영)
   emits('selectSeat', seat)
 }
 
 // 화면 로드시 실행
 onMounted(() => {
-  seats.value = generateSeats() // 좌석 생성
-
+  seats.value = generateSeats()
   console.log('🌟props 값 확인 : ', props.selectedTime, props.resourceReservations)
 })
 
-// 선택된 시간이 바뀔때마다 좌석 재생성
-watch([() => props.selectedTime, () => props.resourceReservations], () => {
-  seats.value = generateSeats()
-})
+// 선택된 시간, 예약목록, Hold목록이 바뀔때마다 좌석 재생성
+watch(
+  [
+    () => props.selectedTime,
+    () => props.resourceReservations,
+    () => props.holdList,
+    () => props.currentHold?.time,
+    () => props.currentHold?.row,
+    () => props.currentHold?.col,
+  ],
+  () => {
+    seats.value = generateSeats()
+  },
+)
 </script>
 
 <template>
-  <div class="p-6 flex flex-col sm:flex-row gap-8">
-
+  <div class="p-6">
     <!-- 좌석판 -->
-    <div class="seat-board flex-1">
+    <div class="seat-board">
       <h2 class="title">좌석</h2>
 
       <!-- 좌석 범례 -->
       <div class="legend">
         <div class="legend-seat empty"></div>
         <span class="legend-text">빈 좌석</span>
-        <div class="legend-seat reserved"></div>
-        <span class="legend-text">예약 완료</span>
+        <div class="legend-seat my-held"></div>
+        <span class="legend-text">선택한 좌석</span>
+        <div class="legend-seat other-held"></div>
+        <span class="legend-text">선택 불가</span>
       </div>
 
       <!-- 실제 좌석 -->
@@ -103,9 +151,14 @@ watch([() => props.selectedTime, () => props.resourceReservations], () => {
             :key="seat.id"
             :class="[
               'seat',
-              seat.reserved ? 'reserved' : 'empty',
+              seat.reserved
+                ? 'reserved'
+                : seat.myHold
+                  ? 'my-held'
+                  : seat.held
+                    ? 'other-held'
+                    : 'empty',
               hoverSeat?.id === seat.id ? 'hovered' : '',
-              selectedSeat?.id === seat.id ? 'selected' : '',
             ]"
             @mouseenter="onSeatHoverBoard(seat)"
             @mouseleave="hoverSeat = null"
@@ -114,33 +167,23 @@ watch([() => props.selectedTime, () => props.resourceReservations], () => {
         </div>
       </div>
 
-      <!-- 툴팁 -->
-      <div
-        v-if="hoverSeat"
-        class="seat-tooltip"
-        :style="{
-          top: `calc(${(hoverSeat.row - 1) * 1.5}rem - 8px)`,
-          left: `${(hoverSeat.col - 1) * 1.5}rem`,
-        }"
-      >
-        <p>좌석 ID : {{ hoverSeat.id }}</p>
-        <p>좌석: {{ hoverSeat.row }}-{{ hoverSeat.col }}</p>
-        <p v-if="hoverSeat.reservationInfo">예약 번호: {{ hoverSeat.reservationInfo.id }}</p>
-        <p v-else class="no-reservation">예약 없음</p>
-      </div>
-    </div>
-
-    <!-- 오른쪽 가격 정보 -->
-    <div class="seat-info-box w-56 border-l pl-6">
-      <h3 class="title">잔여석</h3>
-      <div class="flex flex-col gap-3 text-sm">
-        <div class="flex justify-between text-gray-500 text-xs">
+      <!-- 좌석 정보 통합 영역 -->
+      <div class="seat-info-area">
+        <div class="seat-count">
           <span>총 좌석 {{ rows * cols }}</span>
-          <span>남은 좌석 {{ rows*cols - currentTimeReservations.length || 0 }}</span>
+          <span class="divider">|</span>
+          <span
+            >남은 좌석
+            {{ rows * cols - currentTimeReservations.length - currentTimeHolds.length }}</span
+          >
         </div>
-        <div class="flex justify-between">
-          <span>선택한 좌석</span>
-          <span>{{ selectedSeat ? selectedSeat.row + '행 ' + selectedSeat.col + '열' : '없음'  }}</span>
+        <div class="selected-seat">
+          <!-- 선택된 좌석이 있으면 선택 정보, 없으면 호버 정보 -->
+          <span v-if="props.currentHold?.row && props.currentHold?.col">
+            선택 좌석: {{ props.currentHold.row }}행 {{ props.currentHold.col }}열
+          </span>
+          <span v-else-if="hoverSeat"> 좌석 {{ hoverSeat.row }}행 {{ hoverSeat.col }}열 </span>
+          <span v-else class="text-gray-400"> 좌석을 선택해주세요 </span>
         </div>
       </div>
     </div>
@@ -154,12 +197,6 @@ watch([() => props.selectedTime, () => props.resourceReservations], () => {
 
 .seat-board {
   @apply relative p-4 overflow-visible;
-  flex: 1;
-}
-
-.seat-info-box {
-  @apply bg-white text-gray-800;
-  min-width: 12rem;
 }
 
 .legend {
@@ -174,8 +211,12 @@ watch([() => props.selectedTime, () => props.resourceReservations], () => {
   @apply bg-primary;
 }
 
-.legend-seat.reserved {
-  @apply bg-gray-200;
+.legend-seat.my-held {
+  @apply bg-yellow-300;
+}
+
+.legend-seat.other-held {
+  @apply bg-gray-300;
 }
 
 .legend-text {
@@ -199,23 +240,36 @@ watch([() => props.selectedTime, () => props.resourceReservations], () => {
   @apply bg-primary;
 }
 
+.seat.my-held {
+  @apply bg-yellow-300;
+}
+
+.seat.other-held {
+  @apply bg-gray-300 cursor-not-allowed;
+}
+
 .seat.reserved {
-  @apply bg-gray-200 cursor-not-allowed;
+  @apply bg-gray-300 cursor-not-allowed;
 }
 
 .seat.hovered {
-  @apply ring-2 ring-yellow-400;
+  @apply ring-2 ring-blue-400;
 }
 
-.seat-tooltip {
-  @apply absolute p-2 bg-gray-50 border rounded text-sm text-gray-700 shadow z-10 whitespace-nowrap pointer-events-none;
+/* 좌석 정보 통합 영역 */
+.seat-info-area {
+  @apply mt-4 flex justify-between items-center text-sm;
 }
 
-.seat.selected {
-  @apply ring-2 ring-yellow-400;
+.seat-count {
+  @apply text-gray-500;
 }
 
-.no-reservation {
-  @apply text-gray-400;
+.seat-count .divider {
+  @apply mx-2 text-gray-300;
+}
+
+.selected-seat {
+  @apply font-medium text-gray-700;
 }
 </style>

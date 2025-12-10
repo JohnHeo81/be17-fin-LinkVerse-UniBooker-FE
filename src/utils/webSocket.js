@@ -19,9 +19,9 @@ export function connectWebSocket() {
     // 환경변수에서 API URL 가져와서 WebSocket URL 생성
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
     const wsUrl = `${apiBaseUrl}/ws`
-    
+
     console.log('WebSocket URL:', wsUrl)
-    
+
     const socket = new SockJS(wsUrl, null, {
       withCredentials: true, // ✅ 쿠키 자동 전송
     })
@@ -36,7 +36,7 @@ export function connectWebSocket() {
         stompClient.subscribe('/user/queue/notifications', (message) => {
           console.log('🔔 알림 도착:', message)
 
-          const store = useNotificationStore() 
+          const store = useNotificationStore()
           store.notify()
         })
 
@@ -69,3 +69,32 @@ window.addEventListener('beforeunload', () => {
 
 window.connectWebSocket = connectWebSocket
 window.disconnectWebSocket = disconnectWebSocket
+
+// ✅ 토픽 구독 (Hold 등 추가 구독용)
+export function subscribe(topic, callback) {
+  if (!stompClient || !stompClient.connected) {
+    console.warn('⚠️ WebSocket 연결되지 않음, 구독 불가')
+    return null
+  }
+
+  const subscription = stompClient.subscribe(topic, (message) => {
+    const body = JSON.parse(message.body)
+    callback(body)
+  })
+
+  console.log('📡 토픽 구독:', topic)
+  return subscription
+}
+
+// ✅ 구독 해제
+export function unsubscribe(subscription) {
+  if (subscription) {
+    subscription.unsubscribe()
+    console.log('📡 구독 해제됨')
+  }
+}
+
+// ✅ 연결 상태 확인
+export function isConnected() {
+  return stompClient && stompClient.connected
+}

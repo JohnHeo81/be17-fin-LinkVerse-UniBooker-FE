@@ -62,7 +62,11 @@ onMounted(() => {
           class="service-card"
           @click="goToServiceGroup(item)"
         >
-          <img :src="item.thumbnail  || '/assets/images/no-image.png'" :alt="item.label" class="service-img" />
+          <img
+            :src="item.thumbnail || '/assets/images/no-image.png'"
+            :alt="item.label"
+            class="service-img"
+          />
           <div class="service-body">
             <div class="service-header-row">
               <h3 class="service-name">{{ item.name }}</h3>

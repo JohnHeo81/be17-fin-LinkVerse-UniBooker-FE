@@ -99,6 +99,10 @@ const fetchQueueStatus = async () => {
 
 /** 상세 페이지 이동 (replace로 히스토리 교체) */
 const navigateToDetail = () => {
+  // 진입 토큰 설정 (새로고침 감지용)
+  sessionStorage.setItem('entryToken', 'valid')
+  sessionStorage.setItem('entryResourceId', String(serviceId))
+
   router.replace({
     path: `/c/${companySlug}/services/${serviceGroupId}/detail/${serviceId}`,
   })
