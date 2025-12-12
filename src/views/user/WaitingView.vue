@@ -71,10 +71,15 @@ const fetchQueueStatus = async () => {
     if (res.canEnter) {
       console.log('[QUEUE] ACTIVE → 토큰 소비 후 상세페이지 이동')
 
-      await queueApi.consumeQueueToken(serviceId, queueToken.value)
+      const consumeRes = await queueApi.consumeQueueToken(serviceId, queueToken.value)
 
       clearInterval(pollingTimer)
       localStorage.removeItem(LOCAL_KEY)
+
+      // 백엔드 TTL 저장
+      if (consumeRes?.remainingSeconds) {
+        sessionStorage.setItem('enterTokenTTL', String(consumeRes.remainingSeconds))
+      }
 
       navigateToDetail()
       return
@@ -119,6 +124,12 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   clearInterval(pollingTimer)
+
+  // 대기열 이탈 처리
+  if (queueToken.value) {
+    queueApi.leaveQueue(serviceId, queueToken.value)
+    localStorage.removeItem(LOCAL_KEY)
+  }
 })
 </script>
 
@@ -163,7 +174,7 @@ onBeforeUnmount(() => {
         </div>
 
         <p class="waiting-guide">
-          페이지를 닫아도 자동으로 순번이 유지되며,<br />
+          페이지를 유지해주세요.<br />
           순번이 되면 예약 페이지로 자동 이동합니다.
         </p>
 

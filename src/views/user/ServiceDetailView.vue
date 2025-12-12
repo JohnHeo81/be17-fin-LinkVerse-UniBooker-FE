@@ -66,8 +66,7 @@ const reservationForm = computed(() => ({
 }))
 
 // =============== 입장 토큰 타이머 ================
-const ENTER_TOKEN_TTL = 180 // 30초
-let remainingSeconds = ENTER_TOKEN_TTL
+let remainingSeconds = 0
 let countdownTimer = null
 let holdTimer = null
 
@@ -739,9 +738,10 @@ onMounted(async () => {
   // === 새로고침 감지 (진입 토큰 검증) ===
   const entryToken = sessionStorage.getItem('entryToken')
   const storedResourceId = sessionStorage.getItem('entryResourceId')
+  const enterTokenTTL = sessionStorage.getItem('enterTokenTTL')
 
   // 정상 진입이 아니면 서비스 목록으로 이동
-  if (!entryToken || storedResourceId !== route.params.itemId) {
+  if (!entryToken || storedResourceId !== route.params.itemId || !enterTokenTTL) {
     console.log('[ServiceDetail] 비정상 진입 감지 → 서비스 목록으로 이동')
     const serviceGroupId = route.params.serviceGroupId
     const companySlug = route.params.companySlug
@@ -749,9 +749,13 @@ onMounted(async () => {
     return
   }
 
+  // 백엔드 TTL 적용
+  remainingSeconds = Number(enterTokenTTL)
+
   // 진입 토큰 삭제 (재사용 방지)
   sessionStorage.removeItem('entryToken')
   sessionStorage.removeItem('entryResourceId')
+  sessionStorage.removeItem('enterTokenTTL')
 
   // 진입 시 경고 알림
   alert('⚠️ 새로고침 또는 뒤로가기 시 다시 대기열에 참여해야 합니다.')
