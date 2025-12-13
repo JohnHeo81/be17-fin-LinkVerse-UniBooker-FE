@@ -37,7 +37,7 @@ const handleLogin = async () => {
     const responseData = response.data
 
     if (responseData.isSuccess) {
-      const result = responseData.data 
+      const result = responseData.data
 
       authStore.login(
         {
@@ -48,7 +48,7 @@ const handleLogin = async () => {
         null,
         null,
       )
-      
+
       // WebSocket 연결
       try {
         console.log('🛰️ 로그인 성공 → WebSocket 연결 시도 중...')
@@ -66,8 +66,32 @@ const handleLogin = async () => {
   } catch (error) {
     console.error('로그인 실패:', error)
 
-    if (error.response?.data?.message) {
-      errorMessage.value = error.response.data.message
+    const errorCode = error.response?.data?.code
+    const errorMsg = error.response?.data?.message
+    const remainingAttempts = error.response?.data?.remainingAttempts
+
+    // 1. 계정 잠금 (50011)
+    if (errorCode === 50011) {
+      alert('로그인 시도 횟수를 초과했습니다.\n15분 후에 다시 시도해주세요.')
+      errorMessage.value = '계정이 잠겼습니다. 15분 후 다시 시도해주세요.'
+      return
+    }
+
+    // 2. 비밀번호 오류 + 남은 횟수 안내
+    if (remainingAttempts !== undefined) {
+      if (remainingAttempts > 0) {
+        alert(`비밀번호가 일치하지 않습니다.\n남은 시도 횟수: ${remainingAttempts}회`)
+        errorMessage.value = `남은 시도 횟수: ${remainingAttempts}회`
+      } else {
+        alert('비밀번호가 일치하지 않습니다.\n다음 시도 시 계정이 잠깁니다.')
+        errorMessage.value = '다음 시도 시 계정이 잠깁니다.'
+      }
+      return
+    }
+
+    // 3. 기타 에러
+    if (errorMsg) {
+      errorMessage.value = errorMsg
     } else {
       errorMessage.value = '로그인에 실패했습니다. 다시 시도해주세요.'
     }

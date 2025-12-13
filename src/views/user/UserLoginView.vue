@@ -171,18 +171,34 @@ const handleLogin = async () => {
   } catch (error) {
     console.error('로그인 실패:', error)
 
-    const errorMessage = error.response?.data?.message
+    const errorCode = error.response?.data?.code
+    const errorMsg = error.response?.data?.message
+    const remainingAttempts = error.response?.data?.remainingAttempts
 
-    // 에러 메시지 처리
-    if (errorMessage) {
-      if (errorMessage.includes('이메일') || errorMessage.includes('비밀번호')) {
-        alert('아이디 또는 비밀번호가 일치하지 않습니다.')
-      } else if (errorMessage.includes('정지')) {
+    // 1. 계정 잠금 (50011)
+    if (errorCode === 50011) {
+      alert('로그인 시도 횟수를 초과했습니다.\n15분 후에 다시 시도해주세요.')
+      return
+    }
+
+    // 2. 비밀번호 오류 + 남은 횟수 안내
+    if (remainingAttempts !== undefined) {
+      if (remainingAttempts > 0) {
+        alert(`비밀번호가 일치하지 않습니다.\n남은 시도 횟수: ${remainingAttempts}회`)
+      } else {
+        alert('비밀번호가 일치하지 않습니다.\n다음 시도 시 계정이 잠깁니다.')
+      }
+      return
+    }
+
+    // 3. 기타 에러 처리
+    if (errorMsg) {
+      if (errorMsg.includes('정지')) {
         alert('정지된 계정입니다. 관리자에게 문의하세요.')
-      } else if (errorMessage.includes('탈퇴')) {
+      } else if (errorMsg.includes('탈퇴')) {
         alert('탈퇴한 계정입니다.')
       } else {
-        alert(errorMessage)
+        alert(errorMsg)
       }
     } else {
       alert('로그인에 실패했습니다. 다시 시도해주세요.')

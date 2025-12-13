@@ -83,40 +83,48 @@ const handleLogin = async () => {
   } catch (error) {
     console.error('❌ 로그인 실패:', error)
 
+    const errorCode = error.response?.data?.code
     const errorMsg = error.response?.data?.message
+    const remainingAttempts = error.response?.data?.remainingAttempts
 
+    // 1. 계정 잠금 (50011)
+    if (errorCode === 50011) {
+      alert('로그인 시도 횟수를 초과했습니다.\n15분 후에 다시 시도해주세요.')
+      errorMessage.value = '계정이 잠겼습니다. 15분 후 다시 시도해주세요.'
+      return
+    }
+
+    // 2. 비밀번호 오류 + 남은 횟수 안내
+    if (remainingAttempts !== undefined) {
+      if (remainingAttempts > 0) {
+        alert(`비밀번호가 일치하지 않습니다.\n남은 시도 횟수: ${remainingAttempts}회`)
+        errorMessage.value = `남은 시도 횟수: ${remainingAttempts}회`
+      } else {
+        alert('비밀번호가 일치하지 않습니다.\n다음 시도 시 계정이 잠깁니다.')
+        errorMessage.value = '다음 시도 시 계정이 잠깁니다.'
+      }
+      return
+    }
+
+    // 3. 기타 에러 처리
     if (errorMsg) {
-      // 1. 계정 정지 처리
       if (errorMsg.includes('정지')) {
         alert(
           '계정이 정지되었습니다.\n소속 기업이 서비스 정지 상태이거나, 관리자에 의해 정지되었습니다.\n관리자에게 문의하세요.',
         )
         errorMessage.value = '정지된 계정입니다.'
-      }
-      // 2. 기업 승인 문제 처리
-      else if (errorMsg.includes('승인되지 않은') || errorMsg.includes('승인')) {
+      } else if (errorMsg.includes('승인되지 않은') || errorMsg.includes('승인')) {
         alert(
           '소속 기업이 아직 승인되지 않았거나, 서비스가 정지되었습니다.\n관리자에게 문의하세요.',
         )
         errorMessage.value = '기업 승인 대기 중이거나 서비스 정지 상태입니다.'
-      }
-      // 3. 비활성 계정 처리
-      else if (errorMsg.includes('비활성')) {
+      } else if (errorMsg.includes('비활성')) {
         alert('비활성 상태의 계정입니다.\n관리자에게 문의하세요.')
         errorMessage.value = '비활성 계정입니다.'
-      }
-      // 4. 탈퇴 계정 처리
-      else if (errorMsg.includes('탈퇴')) {
+      } else if (errorMsg.includes('탈퇴')) {
         alert('탈퇴한 계정입니다.')
         errorMessage.value = '탈퇴한 계정입니다.'
-      }
-      // 5. 비밀번호 오류 처리
-      else if (errorMsg.includes('비밀번호') || errorMsg.includes('이메일')) {
-        alert('이메일 또는 비밀번호가 일치하지 않습니다.')
-        errorMessage.value = '이메일 또는 비밀번호를 확인해주세요.'
-      }
-      // 6. 기타 에러
-      else {
+      } else {
         alert(errorMsg)
         errorMessage.value = errorMsg
       }
