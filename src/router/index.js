@@ -410,20 +410,29 @@ router.beforeEach(async (to, from, next) => {
   const requiredRole = to.meta.role
   const currentSlug = to.params.companySlug
 
-  // ===== 2. 로그인 페이지 접근 시 이미 로그인된 사용자 리다이렉트 =====
-  const loginPages = ['UserLogin', 'adminLogin', 'SuperLogin']
+  // ===== 2. 로그인 페이지 접근 시 해당 역할로 로그인된 사용자만 리다이렉트 =====
 
-  if (loginPages.includes(to.name) && authStore.isLoggedIn) {
-    console.log('✅ 이미 로그인된 상태 - 메인 페이지로 리다이렉트')
+  // USER 로그인 페이지: USER로 로그인된 상태면 서비스 목록으로
+  if (to.name === 'UserLogin' && authStore.isLoggedIn && authStore.role === 'USER') {
+    console.log('✅ USER 로그인 상태 - 서비스 목록으로 리다이렉트')
+    const slug = authStore.companySlug || currentSlug || 'default'
+    return next(`/c/${slug}/services`)
+  }
 
-    if (authStore.role === 'USER') {
-      const slug = authStore.companySlug || currentSlug || 'default'
-      return next(`/c/${slug}/services`)
-    } else if (authStore.role === 'ADMIN' || authStore.role === 'MANAGER') {
-      return next('/admin/dashboard')
-    } else if (authStore.role === 'SUPER') {
-      return next('/super/dashboard')
-    }
+  // ADMIN 로그인/홈 페이지: ADMIN/MANAGER로 로그인된 상태면 대시보드로
+  if (
+    (to.name === 'adminLogin' || to.name === 'adminHome') &&
+    authStore.isLoggedIn &&
+    (authStore.role === 'ADMIN' || authStore.role === 'MANAGER')
+  ) {
+    console.log('✅ ADMIN/MANAGER 로그인 상태 - 대시보드로 리다이렉트')
+    return next('/admin/dashboard')
+  }
+
+  // SUPER 로그인 페이지: SUPER로 로그인된 상태면 대시보드로
+  if (to.name === 'SuperLogin' && authStore.isLoggedIn && authStore.role === 'SUPER') {
+    console.log('✅ SUPER 로그인 상태 - 대시보드로 리다이렉트')
+    return next('/super/dashboard')
   }
 
   // ===== 3. 인증 불필요 페이지는 바로 통과 =====
