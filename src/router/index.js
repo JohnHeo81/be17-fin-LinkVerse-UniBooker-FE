@@ -335,50 +335,51 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-// ===== 0. Company 정지 상태 체크 (로그인한 일반 사용자만) =====
-if (to.path.startsWith('/c/') && 
-    to.name !== 'ServiceSuspended' && 
+  // ===== 0. Company 정지 상태 체크 (로그인한 일반 사용자만) =====
+  if (
+    to.path.startsWith('/c/') &&
+    to.name !== 'ServiceSuspended' &&
     to.name !== 'UserLogin' &&
-    to.name !== 'UserSignup') {
-  
-  const companySlug = to.params.companySlug
+    to.name !== 'UserSignup'
+  ) {
+    const companySlug = to.params.companySlug
 
-  // ✅ 로그인한 USER만 Company 상태 체크
-  if (companySlug && authStore.isLoggedIn && authStore.role === 'USER') {
-    try {
-      const response = await axiosInstance.get(`/api/companies/slug/${companySlug}`)
-      const company = response.data.data
+    // ✅ 로그인한 USER만 Company 상태 체크
+    if (companySlug && authStore.isLoggedIn && authStore.role === 'USER') {
+      try {
+        const response = await axiosInstance.get(`/api/companies/slug/${companySlug}`)
+        const company = response.data.data
 
-      if (company.status === 'SUSPENDED') {
-        console.log('🔴 Company SUSPENDED 감지:', companySlug)
-        return next({
-          name: 'ServiceSuspended',
-          params: { companySlug },
-        })
-      }
-    } catch (error) {
-      const errorCode = error.response?.data?.code
+        if (company.status === 'SUSPENDED') {
+          console.log('🔴 Company SUSPENDED 감지:', companySlug)
+          return next({
+            name: 'ServiceSuspended',
+            params: { companySlug },
+          })
+        }
+      } catch (error) {
+        const errorCode = error.response?.data?.code
 
-      if (errorCode === 40013) {
-        console.log('🔴 Company SUSPENDED 에러 감지:', companySlug)
-        
-        if (authStore.isLoggedIn) {
-          authStore.logout()
-          localStorage.clear()
-          alert('서비스가 일시 정지되어 로그아웃됩니다.')
+        if (errorCode === 40013) {
+          console.log('🔴 Company SUSPENDED 에러 감지:', companySlug)
+
+          if (authStore.isLoggedIn) {
+            authStore.logout()
+            localStorage.clear()
+            alert('서비스가 일시 정지되어 로그아웃됩니다.')
+          }
+
+          return next({
+            name: 'ServiceSuspended',
+            params: { companySlug },
+          })
         }
 
-        return next({
-          name: 'ServiceSuspended',
-          params: { companySlug },
-        })
+        // 기타 에러는 로그만
+        console.warn('⚠️ Company 상태 확인 실패:', error.message)
       }
-
-      // 기타 에러는 로그만
-      console.warn('⚠️ Company 상태 확인 실패:', error.message)
     }
   }
-}
 
   // ===== 역할 검증 헬퍼 함수 =====
 
@@ -409,14 +410,30 @@ if (to.path.startsWith('/c/') &&
   const requiredRole = to.meta.role
   const currentSlug = to.params.companySlug
 
-  // ===== 2. 인증 불필요 페이지는 바로 통과 =====
+  // ===== 2. 로그인 페이지 접근 시 이미 로그인된 사용자 리다이렉트 =====
+  const loginPages = ['UserLogin', 'adminLogin', 'SuperLogin']
+
+  if (loginPages.includes(to.name) && authStore.isLoggedIn) {
+    console.log('✅ 이미 로그인된 상태 - 메인 페이지로 리다이렉트')
+
+    if (authStore.role === 'USER') {
+      const slug = authStore.companySlug || currentSlug || 'default'
+      return next(`/c/${slug}/services`)
+    } else if (authStore.role === 'ADMIN' || authStore.role === 'MANAGER') {
+      return next('/admin/dashboard')
+    } else if (authStore.role === 'SUPER') {
+      return next('/super/dashboard')
+    }
+  }
+
+  // ===== 3. 인증 불필요 페이지는 바로 통과 =====
   if (requiresAuth === false) {
     return next()
   }
 
-  // ===== 3. 인증 필요 페이지 접근 제어 =====
+  // ===== 4. 인증 필요 페이지 접근 제어 =====
   if (requiresAuth === true) {
-    // 3-1. localStorage에 인증 정보 없으면 로그아웃 처리
+    // 4-1. localStorage에 인증 정보 없으면 로그아웃 처리
     if (!authStore.isLoggedIn) {
       console.warn('🚫 인증되지 않은 접근 시도 - 로그인 페이지로 리다이렉트')
 
@@ -434,7 +451,7 @@ if (to.path.startsWith('/c/') &&
       return next('/')
     }
 
-    // 3-2. 역할 불일치 검증 (Manager는 Admin 페이지 접근 가능)
+    // 4-2. 역할 불일치 검증 (Manager는 Admin 페이지 접근 가능)
     const onlyAdmin = to.meta.onlyAdmin
     if (requiredRole && !isRoleAllowed(authStore.role, requiredRole, onlyAdmin)) {
       console.warn('🚫 권한 불일치:', {
@@ -457,7 +474,7 @@ if (to.path.startsWith('/c/') &&
       return next('/')
     }
 
-    // 3-3. USER 역할: Company slug 검증 (경고만)
+    // 4-3. USER 역할: Company slug 검증 (경고만)
     if (requiredRole === 'USER' && currentSlug) {
       if (authStore.companySlug && authStore.companySlug !== currentSlug) {
         console.warn('⚠️ Company Slug 불일치 (백엔드 검증 예정):', {
@@ -469,7 +486,7 @@ if (to.path.startsWith('/c/') &&
     }
   }
 
-  // ===== 4. 모든 검증 통과 → 페이지 이동 =====
+  // ===== 5. 모든 검증 통과 → 페이지 이동 =====
   next()
 })
 
