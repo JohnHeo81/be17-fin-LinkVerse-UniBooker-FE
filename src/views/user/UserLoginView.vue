@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import userApi from '@/services/user/user_api'
+import oauthApi from '@/services/user/oauth_api'
 import { useAuthStore } from '@/stores/UseStore'
 import { connectWebSocket } from '@/utils/webSocket'
 
@@ -233,6 +234,19 @@ const goToFindPassword = () => {
     alert('기업 정보를 불러오는 중입니다.')
   }
 }
+
+// ========== 소셜 로그인 ==========
+
+/**
+ * 소셜 로그인 시작
+ */
+const handleOAuthLogin = (provider) => {
+  if (!companyInfo.value) {
+    alert('기업 정보를 불러오는 중입니다.')
+    return
+  }
+  oauthApi.startOAuth(provider, companyInfo.value.companySlug)
+}
 </script>
 
 <template>
@@ -299,6 +313,26 @@ const goToFindPassword = () => {
           <Button type="button" @click="goToSignup" class="user-login-signup-button">
             회원가입
           </Button>
+
+          <!-- 소셜 로그인 구분선 -->
+          <div class="user-login-social-divider">
+            <span class="user-login-social-divider-line"></span>
+            <span class="user-login-social-divider-text">또는</span>
+            <span class="user-login-social-divider-line"></span>
+          </div>
+
+          <!-- 소셜 로그인 버튼 -->
+          <div class="user-login-social-buttons">
+            <button @click="handleOAuthLogin('naver')" class="user-login-social-button">
+              <img src="/assets/icons/btn_naver.svg" alt="네이버" class="user-login-social-icon" />
+            </button>
+            <button @click="handleOAuthLogin('kakao')" class="user-login-social-button">
+              <img src="/assets/icons/btn_kakao.svg" alt="카카오" class="user-login-social-icon" />
+            </button>
+            <button @click="handleOAuthLogin('google')" class="user-login-social-button">
+              <img src="/assets/icons/btn_google.svg" alt="구글" class="user-login-social-icon" />
+            </button>
+          </div>
         </form>
       </div>
     </main>
@@ -387,5 +421,32 @@ const goToFindPassword = () => {
 .user-login-signup-button {
   @apply w-[250px] py-2 bg-white text-primary border border-primary font-medium;
   @apply hover:bg-gray-100 transition-all duration-200;
+}
+
+/* 소셜 로그인 구분선 */
+.user-login-social-divider {
+  @apply flex items-center w-[250px] my-4;
+}
+
+.user-login-social-divider-line {
+  @apply flex-1 h-px bg-gray-300;
+}
+
+.user-login-social-divider-text {
+  @apply px-3 my-5 text-sm text-gray-400;
+}
+
+/* 소셜 로그인 버튼 */
+.user-login-social-buttons {
+  @apply mb-5 flex flex-row justify-center gap-8;
+}
+
+.user-login-social-button {
+  @apply bg-transparent border-none cursor-pointer p-0;
+  @apply transition-transform duration-200 hover:scale-105;
+}
+
+.user-login-social-icon {
+  @apply w-10 h-10;
 }
 </style>

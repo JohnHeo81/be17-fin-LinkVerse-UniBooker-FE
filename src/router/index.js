@@ -22,6 +22,24 @@ const router = createRouter({
       meta: { layout: 'user', requiresAuth: false },
     },
     {
+      path: '/c/:companySlug/oauth/callback',
+      name: 'OAuthCallback',
+      component: () => import('@/views/user/OAuthCallbackView.vue'),
+      meta: { layout: 'user', requiresAuth: false },
+    },
+    {
+      path: '/c/:companySlug/oauth/agreement',
+      name: 'OAuthAgreement',
+      component: () => import('@/views/user/OAuthAgreementView.vue'),
+      meta: { layout: 'user', requiresAuth: false },
+    },
+    {
+      path: '/c/:companySlug/oauth/email',
+      name: 'OAuthEmail',
+      component: () => import('@/views/user/OAuthEmailView.vue'),
+      meta: { layout: 'user', requiresAuth: false },
+    },
+    {
       path: '/c/:companySlug/user/mypage',
       name: 'userMypage',
       component: () => import('@/views/user/UserMypageView.vue'),
