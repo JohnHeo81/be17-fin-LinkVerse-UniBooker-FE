@@ -323,13 +323,25 @@ const handleOAuthLogin = (provider) => {
 
           <!-- 소셜 로그인 버튼 -->
           <div class="user-login-social-buttons">
-            <button @click="handleOAuthLogin('naver')" class="user-login-social-button">
+            <button
+              type="button"
+              @click="handleOAuthLogin('naver')"
+              class="user-login-social-button"
+            >
               <img src="/assets/icons/btn_naver.svg" alt="네이버" class="user-login-social-icon" />
             </button>
-            <button @click="handleOAuthLogin('kakao')" class="user-login-social-button">
+            <button
+              type="button"
+              @click="handleOAuthLogin('kakao')"
+              class="user-login-social-button"
+            >
               <img src="/assets/icons/btn_kakao.svg" alt="카카오" class="user-login-social-icon" />
             </button>
-            <button @click="handleOAuthLogin('google')" class="user-login-social-button">
+            <button
+              type="button"
+              @click="handleOAuthLogin('google')"
+              class="user-login-social-button"
+            >
               <img src="/assets/icons/btn_google.svg" alt="구글" class="user-login-social-icon" />
             </button>
           </div>
