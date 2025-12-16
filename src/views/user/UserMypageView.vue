@@ -650,8 +650,16 @@ onMounted(() => {
 }
 
 .social-account-button {
-  @apply flex items-center gap-2 pl-2 py-2 pr-4 rounded-full border border-gray-300 bg-white;
-  @apply hover:bg-gray-50 transition-all duration-200 cursor-pointer;
+  @apply flex items-center gap-2 pl-2 py-2 pr-4 rounded-full border border-gray-300 bg-gray-200;
+  @apply transition-all duration-200 cursor-pointer;
+}
+
+.social-account-button:hover {
+  @apply bg-white border-primary;
+}
+
+.social-account-button:hover .social-account-text {
+  @apply text-primary;
 }
 
 .social-account-button:disabled {
@@ -660,7 +668,11 @@ onMounted(() => {
 
 /* 연동된 상태 - 파란 테두리 */
 .social-account-linked {
-  @apply border-primary border-2;
+  @apply bg-white border-primary border-2;
+}
+
+.social-account-linked .social-account-text {
+  @apply text-primary;
 }
 
 .social-account-icon {
@@ -668,6 +680,6 @@ onMounted(() => {
 }
 
 .social-account-text {
-  @apply text-sm text-gray-700;
+  @apply text-sm text-gray-400 transition-colors duration-200;
 }
 </style>
