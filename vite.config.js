@@ -18,12 +18,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',  // API Gateway 주소
+        target: 'https://www.unibooker.n-e.kr',  // API Gateway 주소
         changeOrigin: true,
         secure: false,
       },
       '/ws': {
-        target: 'http://localhost:8080',  // WebSocket도 프록시
+        target: 'wss://api.unibooker.n-e.kr',  // WebSocket도 프록시
         ws: true,
         changeOrigin: true,
       }

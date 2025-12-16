@@ -462,38 +462,30 @@ onMounted(() => {
 
           <!-- 소셜 계정 연동 -->
           <div class="social-account-section">
-            <h3 class="social-account-title">소셜 계정 연동</h3>
+            <label class="user-mypage-label">소셜 계정 연동</label>
             <div class="social-account-list">
-              <div
+              <button
                 v-for="account in socialAccounts"
                 :key="account.provider"
-                class="social-account-item"
+                type="button"
+                @click="
+                  account.linked
+                    ? handleUnlinkSocial(account.provider, account.providerName)
+                    : handleLinkSocial(account.provider)
+                "
+                class="social-account-button"
+                :class="{ 'social-account-linked': account.linked }"
+                :disabled="socialLoading"
               >
-                <div class="social-account-info">
-                  <span class="social-account-icon" :class="getProviderIconClass(account.provider)">
-                    {{ getProviderIcon(account.provider) }}
-                  </span>
-                  <span class="social-account-name">{{ account.providerName }}</span>
-                </div>
-                <Button
-                  v-if="account.linked"
-                  type="button"
-                  @click="handleUnlinkSocial(account.provider, account.providerName)"
-                  class="social-unlink-button"
-                  :disabled="socialLoading"
-                >
-                  연동 해제
-                </Button>
-                <Button
-                  v-else
-                  type="button"
-                  @click="handleLinkSocial(account.provider)"
-                  class="social-link-button"
-                  :disabled="socialLoading"
-                >
-                  연동하기
-                </Button>
-              </div>
+                <img
+                  :src="`/assets/icons/btn_${account.provider.toLowerCase()}.svg`"
+                  :alt="account.providerName"
+                  class="social-account-icon"
+                />
+                <span class="social-account-text">
+                  {{ account.linked ? '연동해제' : '연동하기' }}
+                </span>
+              </button>
             </div>
           </div>
 
@@ -552,7 +544,7 @@ onMounted(() => {
 
 /* 회원정보 카드 */
 .user-mypage-card {
-  @apply bg-white rounded-[20px] shadow-md w-full max-w-[900px] h-[600px] p-10;
+  @apply bg-white rounded-[20px] shadow-md w-full max-w-[900px] p-20;
 }
 
 .user-mypage-title {
@@ -595,7 +587,7 @@ onMounted(() => {
 
 /* 전화번호 필드 하단 간격 */
 .user-mypage-input-last {
-  @apply mb-[60px];
+  @apply mb-4;
 }
 
 /* 버튼 정렬 */
@@ -650,40 +642,32 @@ onMounted(() => {
 
 /* 소셜 계정 연동 섹션 */
 .social-account-section {
-  @apply w-full max-w-[400px] mb-6 mt-2;
-}
-
-.social-account-title {
-  @apply text-[14px] font-medium text-gray-600 mb-3 px-2;
+  @apply w-full max-w-[400px] mb-10;
 }
 
 .social-account-list {
-  @apply flex flex-col gap-2;
+  @apply flex justify-center mt-3 gap-6;
 }
 
-.social-account-item {
-  @apply flex items-center justify-between p-3 bg-gray-50 rounded-lg;
+.social-account-button {
+  @apply flex items-center gap-2 pl-2 py-2 pr-4 rounded-full border border-gray-300 bg-white;
+  @apply hover:bg-gray-50 transition-all duration-200 cursor-pointer;
 }
 
-.social-account-info {
-  @apply flex items-center gap-3;
+.social-account-button:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* 연동된 상태 - 파란 테두리 */
+.social-account-linked {
+  @apply border-primary border-2;
 }
 
 .social-account-icon {
-  @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold;
+  @apply w-5 h-5 mr-1;
 }
 
-.social-account-name {
+.social-account-text {
   @apply text-sm text-gray-700;
-}
-
-.social-link-button {
-  @apply px-4 py-1.5 text-xs bg-primary text-white rounded;
-  @apply hover:bg-primary-hover transition-all duration-200;
-}
-
-.social-unlink-button {
-  @apply px-4 py-1.5 text-xs bg-white text-gray-600 border border-gray-300 rounded;
-  @apply hover:bg-gray-100 transition-all duration-200;
 }
 </style>
