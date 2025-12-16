@@ -33,6 +33,36 @@ const oauthApi = {
     })
     return response.data
   },
+
+  // ========== 소셜 계정 연동 관리 ==========
+
+  /**
+   * 연동된 소셜 계정 목록 조회
+   */
+  getLinkedAccounts: async () => {
+    const response = await axiosInstance.get('/api/oauth/accounts', {
+      withCredentials: true,
+    })
+    return response.data
+  },
+
+  /**
+   * 소셜 계정 연동 시작 (마이페이지에서)
+   */
+  startLinkOAuth: (provider) => {
+    const backendUrl = import.meta.env.VITE_API_BASE_URL || ''
+    window.location.href = `${backendUrl}/api/oauth/link/${provider}`
+  },
+
+  /**
+   * 소셜 계정 연동 해제
+   */
+  unlinkAccount: async (provider) => {
+    const response = await axiosInstance.delete(`/api/oauth/accounts/${provider}`, {
+      withCredentials: true,
+    })
+    return response.data
+  },
 }
 
 export default oauthApi

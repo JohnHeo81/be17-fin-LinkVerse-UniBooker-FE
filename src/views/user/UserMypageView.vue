@@ -8,10 +8,15 @@ import PasswordChangeModal from '@/components/PasswordChangeModal.vue'
 import WithdrawConfirmModal from '@/components/WithdrawConfirmModal.vue'
 import Toast from '@/components/Toast.vue'
 import userApi from '@/services/user/user_api'
+import oauthApi from '@/services/user/oauth_api'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+
+// 소셜 계정 연동 상태 (기존 reactive 선언 아래에)
+const socialAccounts = ref([])
+const socialLoading = ref(false)
 
 // 로딩 상태
 const isLoading = ref(false)
@@ -280,6 +285,124 @@ const handleConfirmWithdraw = async (password) => {
   }
 }
 
+// ========== 소셜 계정 연동 ==========
+
+/**
+ * 연동된 소셜 계정 목록 조회
+ */
+const loadSocialAccounts = async () => {
+  try {
+    socialLoading.value = true
+    const response = await oauthApi.getLinkedAccounts()
+
+    if (response.isSuccess) {
+      socialAccounts.value = response.data
+    }
+  } catch (error) {
+    console.error('소셜 계정 조회 오류:', error)
+  } finally {
+    socialLoading.value = false
+  }
+}
+
+/**
+ * 소셜 계정 연동
+ */
+const handleLinkSocial = (provider) => {
+  oauthApi.startLinkOAuth(provider)
+}
+
+/**
+ * 소셜 계정 연동 해제
+ */
+const handleUnlinkSocial = async (provider, providerName) => {
+  if (!confirm(`${providerName} 계정 연동을 해제하시겠습니까?`)) {
+    return
+  }
+
+  try {
+    socialLoading.value = true
+    const response = await oauthApi.unlinkAccount(provider)
+
+    if (response.isSuccess) {
+      showToast(`${providerName} 계정 연동이 해제되었습니다.`, 'success')
+      await loadSocialAccounts()
+    } else {
+      showToast(response.message || '연동 해제에 실패했습니다.', 'error')
+    }
+  } catch (error) {
+    console.error('연동 해제 오류:', error)
+
+    if (error.response?.data?.message) {
+      showToast(error.response.data.message, 'error')
+    } else {
+      showToast('연동 해제 중 오류가 발생했습니다.', 'error')
+    }
+  } finally {
+    socialLoading.value = false
+  }
+}
+
+/**
+ * URL 파라미터로 연동 결과 확인
+ */
+const checkLinkResult = () => {
+  const linkStatus = route.query.link
+  const provider = route.query.provider
+  const message = route.query.message
+
+  if (linkStatus === 'success' && provider) {
+    const providerName =
+      provider === 'kakao'
+        ? '카카오'
+        : provider === 'naver'
+          ? '네이버'
+          : provider === 'google'
+            ? '구글'
+            : provider
+    showToast(`${providerName} 계정이 연동되었습니다.`, 'success')
+
+    // URL 파라미터 제거
+    router.replace({ query: {} })
+  } else if (linkStatus === 'error') {
+    const errorMessage =
+      message === 'already_linked'
+        ? '이미 다른 계정에 연동된 소셜 계정입니다.'
+        : message === 'already_linked_provider'
+          ? '이미 연동된 소셜 계정입니다.'
+          : message || '연동에 실패했습니다.'
+
+    showToast(errorMessage, 'error')
+    router.replace({ query: {} })
+  }
+}
+
+/**
+ * Provider 아이콘 클래스
+ */
+const getProviderIconClass = (provider) => {
+  return (
+    {
+      KAKAO: 'bg-[#FEE500] text-[#3C1E1E]',
+      NAVER: 'bg-[#03C75A] text-white',
+      GOOGLE: 'bg-white border border-gray-300 text-gray-700',
+    }[provider] || ''
+  )
+}
+
+/**
+ * Provider 아이콘 텍스트
+ */
+const getProviderIcon = (provider) => {
+  return (
+    {
+      KAKAO: 'K',
+      NAVER: 'N',
+      GOOGLE: 'G',
+    }[provider] || ''
+  )
+}
+
 // ========== 초기화 ==========
 
 /**
@@ -287,6 +410,8 @@ const handleConfirmWithdraw = async (password) => {
  */
 onMounted(() => {
   loadProfile()
+  loadSocialAccounts()
+  checkLinkResult()
 })
 </script>
 
@@ -333,6 +458,43 @@ onMounted(() => {
               placeholder="010-1234-5678"
               class="user-mypage-input user-mypage-input-last"
             />
+          </div>
+
+          <!-- 소셜 계정 연동 -->
+          <div class="social-account-section">
+            <h3 class="social-account-title">소셜 계정 연동</h3>
+            <div class="social-account-list">
+              <div
+                v-for="account in socialAccounts"
+                :key="account.provider"
+                class="social-account-item"
+              >
+                <div class="social-account-info">
+                  <span class="social-account-icon" :class="getProviderIconClass(account.provider)">
+                    {{ getProviderIcon(account.provider) }}
+                  </span>
+                  <span class="social-account-name">{{ account.providerName }}</span>
+                </div>
+                <Button
+                  v-if="account.linked"
+                  type="button"
+                  @click="handleUnlinkSocial(account.provider, account.providerName)"
+                  class="social-unlink-button"
+                  :disabled="socialLoading"
+                >
+                  연동 해제
+                </Button>
+                <Button
+                  v-else
+                  type="button"
+                  @click="handleLinkSocial(account.provider)"
+                  class="social-link-button"
+                  :disabled="socialLoading"
+                >
+                  연동하기
+                </Button>
+              </div>
+            </div>
           </div>
 
           <!-- 버튼 그룹 -->
@@ -484,5 +646,44 @@ onMounted(() => {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* 소셜 계정 연동 섹션 */
+.social-account-section {
+  @apply w-full max-w-[400px] mb-6 mt-2;
+}
+
+.social-account-title {
+  @apply text-[14px] font-medium text-gray-600 mb-3 px-2;
+}
+
+.social-account-list {
+  @apply flex flex-col gap-2;
+}
+
+.social-account-item {
+  @apply flex items-center justify-between p-3 bg-gray-50 rounded-lg;
+}
+
+.social-account-info {
+  @apply flex items-center gap-3;
+}
+
+.social-account-icon {
+  @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold;
+}
+
+.social-account-name {
+  @apply text-sm text-gray-700;
+}
+
+.social-link-button {
+  @apply px-4 py-1.5 text-xs bg-primary text-white rounded;
+  @apply hover:bg-primary-hover transition-all duration-200;
+}
+
+.social-unlink-button {
+  @apply px-4 py-1.5 text-xs bg-white text-gray-600 border border-gray-300 rounded;
+  @apply hover:bg-gray-100 transition-all duration-200;
 }
 </style>
