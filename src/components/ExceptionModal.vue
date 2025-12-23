@@ -6,6 +6,7 @@ const props = defineProps({
   interval: Number,
   modelValue: { type: Array, default: () => [] },
   excludedTimes: { type: Array, default: () => [] },
+  category: { type: String, default: 'RESERVATION' },
 })
 
 const emit = defineEmits(['update:modelValue', 'close'])
@@ -127,7 +128,7 @@ watch(
           closed: false,
           note: '',
           startTime: toHHMM(allTimes[0]),
-          endTime: toHHMM(allTimes[allTimes.length - 1] + props.interval), 
+          endTime: toHHMM(allTimes[allTimes.length - 1] + props.interval),
           selectedTimes: allTimes.map(toHHMM),
         })
       }
@@ -225,6 +226,32 @@ const addException = () => {
   closeModal()
 }
 
+// 좌석형: 시작~종료 전체를 1개 예외로 추가
+const addExceptionDirect = () => {
+  const start = `${startHour.value}:${startMinute.value}`
+  const end = `${endHour.value}:${endMinute.value}`
+
+  const newItem = closed.value
+    ? {
+        date: date.value,
+        note: note.value,
+        closed: true,
+        selectedTimes: [],
+      }
+    : {
+        date: date.value,
+        startTime: start,
+        endTime: end,
+        note: note.value,
+        closed: false,
+        selectedTimes: [start],
+      }
+
+  props.modelValue.push(newItem)
+  emit('update:modelValue', [...props.modelValue])
+  resetForm()
+}
+
 // 제외시간 선택 모달 열기 전에 체크
 const checkBeforeOpenModal = () => {
   if (!date.value) {
@@ -235,6 +262,12 @@ const checkBeforeOpenModal = () => {
     if (!startHour.value || !startMinute.value || !endHour.value || !endMinute.value) {
       return alert('시작시간과 종료시간을 입력해주세요.')
     }
+  }
+
+  // 좌석형: 모달 없이 바로 추가
+  if (props.category === 'SEAT') {
+    addExceptionDirect()
+    return
   }
 
   openModal()
@@ -319,42 +352,54 @@ defineExpose({
           isClosed: true,
           note: ex.note || '',
         })
-      } else {
-        // selectedTimes를 분 단위로 정렬
-        const selectedMins = (ex.selectedTimes || [])
-          .map((t) => {
-            const [h, m] = t.split(':').map(Number)
-            return h * 60 + m
+        return
+      }
+
+      // 좌석형: 시작~종료 전체를 1개 슬롯으로
+      if (props.category === 'SEAT') {
+        slots.push({
+          date: ex.date,
+          startTime: ex.startTime,
+          endTime: ex.endTime,
+          isClosed: false,
+          note: ex.note || '',
+        })
+        return
+      }
+
+      // 예약형: 기존 interval 기반 로직
+      const selectedMins = (ex.selectedTimes || [])
+        .map((t) => {
+          const [h, m] = t.split(':').map(Number)
+          return h * 60 + m
+        })
+        .sort((a, b) => a - b)
+
+      if (!selectedMins.length) return
+
+      let blockStart = selectedMins[0]
+      let prev = selectedMins[0]
+
+      for (let i = 1; i <= selectedMins.length; i++) {
+        const curr = selectedMins[i]
+
+        if (curr !== prev + props.interval) {
+          const startH = String(Math.floor(blockStart / 60)).padStart(2, '0')
+          const startM = String(blockStart % 60).padStart(2, '0')
+          const endH = String(Math.floor(prev / 60)).padStart(2, '0')
+          const endM = String(prev % 60).padStart(2, '0')
+
+          slots.push({
+            date: ex.date,
+            startTime: `${startH}:${startM}`,
+            endTime: `${endH}:${endM}`,
+            isClosed: false,
+            note: ex.note || '',
           })
-          .sort((a, b) => a - b)
 
-        if (!selectedMins.length) return
-
-        let blockStart = selectedMins[0]
-        let prev = selectedMins[0]
-
-        for (let i = 1; i <= selectedMins.length; i++) {
-          const curr = selectedMins[i]
-
-          if (curr !== prev + props.interval) {
-            // 연속 블록 종료
-            const startH = String(Math.floor(blockStart / 60)).padStart(2, '0')
-            const startM = String(blockStart % 60).padStart(2, '0')
-            const endH = String(Math.floor(prev / 60)).padStart(2, '0')
-            const endM = String(prev % 60).padStart(2, '0')
-
-            slots.push({
-              date: ex.date,
-              startTime: `${startH}:${startM}`,
-              endTime: `${endH}:${endM}`,
-              isClosed: false,
-              note: ex.note || '',
-            })
-
-            blockStart = curr
-          }
-          prev = curr
+          blockStart = curr
         }
+        prev = curr
       }
     })
 

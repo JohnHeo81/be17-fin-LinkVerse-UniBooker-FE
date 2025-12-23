@@ -6,6 +6,7 @@ import Button from '@/components/Button.vue'
 const props = defineProps({
   interval: Number,
   existingSlots: { type: Array, default: () => [] },
+  category: { type: String, default: 'RESERVATION' },
 })
 
 const days = ['월', '화', '수', '목', '금', '토', '일']
@@ -129,6 +130,13 @@ const openModal = () => {
     alert('요일을 선택해주세요.')
     return
   }
+
+  // 좌석형: 모달 없이 바로 추가
+  if (props.category === 'SEAT') {
+    addSlotDirect()
+    return
+  }
+
   modalOpen.value = true
 }
 
@@ -169,20 +177,27 @@ function toHHMM(min) {
 defineExpose({
   resetAll,
   getTimeSlots: () => {
-    const interval = Number(props.interval || 60)
     const result = []
 
     timeSlots.value.forEach((slot) => {
-      // 포함된 시각 리스트(선택된 시간들)
-      const includedArr = Array.isArray(slot.selectedTimes)
-        ? [...slot.selectedTimes].sort()
-        : []
+      // 좌석형: 시작~종료 전체를 1개 슬롯으로
+      if (props.category === 'SEAT') {
+        result.push({
+          days: slot.days.map((d) => dayMap[d] || d),
+          startTime: slot.start,
+          endTime: slot.end,
+        })
+        return
+      }
+
+      // 예약형: 기존 interval 기반 로직
+      const interval = Number(props.interval || 60)
+      const includedArr = Array.isArray(slot.selectedTimes) ? [...slot.selectedTimes].sort() : []
 
       if (!includedArr.length) return
 
       const startTimesInMin = includedArr.map(toMinutes)
 
-      // 연속된 구간을 묶는다
       let blockStart = startTimesInMin[0]
       let prev = startTimesInMin[0]
 
@@ -190,15 +205,13 @@ defineExpose({
         const cur = startTimesInMin[i]
         const isContiguous = cur === prev + interval
 
-        // 블록 종료 시점
         if (!isContiguous) {
           result.push({
             days: slot.days.map((d) => dayMap[d] || d),
             startTime: toHHMM(blockStart),
-            endTime: toHHMM(prev + interval), // ✅ 마지막 시작 + interval
+            endTime: toHHMM(prev + interval),
           })
 
-          // 새 블록 시작
           if (cur) {
             blockStart = cur
             prev = cur
@@ -232,7 +245,7 @@ const addSlot = () => {
   const newSlot = {
     days: sortedDays,
     start: selectedTimes.value[0],
-    end: endTime, 
+    end: endTime,
     selectedTimes: [...selectedTimes.value],
   }
 
@@ -247,6 +260,32 @@ const addSlot = () => {
   selectedTimes.value = []
   editingIndex.value = null
   closeModal()
+}
+
+// 좌석형: 시작~종료 전체를 1개 슬롯으로 추가
+const addSlotDirect = () => {
+  const start = `${startHour.value}:${startMinute.value}`
+  const end = `${endHour.value}:${endMinute.value}`
+
+  const sortedDays = [...selectedDays.value].sort(
+    (a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b),
+  )
+
+  const newSlot = {
+    days: sortedDays,
+    start,
+    end,
+    selectedTimes: [start], // 시작시간만 (회차 개념)
+  }
+
+  timeSlots.value.push(newSlot)
+
+  // 입력값 초기화
+  selectedDays.value = []
+  startHour.value = ''
+  startMinute.value = ''
+  endHour.value = ''
+  endMinute.value = ''
 }
 
 const removeSlot = (idx) => {
