@@ -718,6 +718,18 @@ const disabledDates = computed(() => {
     after.setDate(after.getDate() + 1)
   }
 
+  // 운영 시간이 없는 날짜 비활성화 (yearMonthTimeSlots 기반)
+  if (yearMonthTimeSlots.value && yearMonthTimeSlots.value.length > 0) {
+    yearMonthTimeSlots.value.forEach((daySlot) => {
+      // slots가 비어있거나 closed인 경우 비활성화
+      if (daySlot.closed || !daySlot.slots || daySlot.slots.length === 0) {
+        if (!disabled.includes(daySlot.date)) {
+          disabled.push(daySlot.date)
+        }
+      }
+    })
+  }
+
   return disabled
 })
 
