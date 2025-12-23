@@ -354,7 +354,7 @@ const back = () => {
         </div>
 
         <!-- 시간 간격 선택 -->
-        <div v-if="category != 'EVENT'" class="service-info-section">
+        <div v-if="category == 'RESERVATION'" class="service-info-section">
           <div class="service-info-form-item-label-container">
             <span>시간 간격 선택</span>
           </div>
@@ -380,7 +380,7 @@ const back = () => {
         </div>
 
         <!-- 서비스 이용 시간  -->
-        <div v-if="category != 'EVENT'" class="service-info-section">
+        <div v-if="category == 'RESERVATION'" class="service-info-section">
           <div class="service-info-form-item-label-container">
             <span>정기 이용 시간 (매주 반복)</span>
             <p>
@@ -399,7 +399,7 @@ const back = () => {
         </div>
 
         <!-- 제외 시간  -->
-        <div v-if="category != 'EVENT'" class="service-info-section mt-[40px]">
+        <div v-if="category == 'RESERVATION'" class="service-info-section mt-[40px]">
           <div class="service-info-form-item-label-container">
             <span>예외 일정</span>
             <p>특정 날짜에만 적용되는 일정이 있거나 휴무나 점검 시간 등을 입력해 주세요.</p>
