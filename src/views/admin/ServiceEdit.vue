@@ -111,8 +111,20 @@ const getServiceInfo = async () => {
     }
 
     // 커스텀 필드 값 조회
+    // 커스텀 필드 값 조회 (정의 정보 포함)
     const customRes = await serviceApi.getResourceCustomFieldAndValue(serviceId)
     if (customRes?.data?.data) {
+      // customFieldDefinitions에 정의 정보 설정
+      customFieldDefinitions.value = customRes.data.data.map((field) => ({
+        id: field.customFieldId,
+        fieldName: field.fieldName,
+        dataType: field.dataType,
+        required: field.required,
+        description: field.description,
+        options: field.options || [],
+      }))
+
+      // customFieldValues에 값 설정
       customFieldValues.value = customRes.data.data.map((field) => ({
         customFieldId: field.customFieldId,
         fieldName: field.fieldName,
@@ -471,6 +483,44 @@ const back = () => {
                   false-value="false"
                 />
               </label>
+
+              <div v-else-if="field.dataType === 'CHECKBOX'" class="flex flex-col space-y-1">
+                <Input
+                  v-for="(option, i) in field.options"
+                  :key="i"
+                  type="checkbox"
+                  :label="option.label || option"
+                  :value="option.value || option"
+                  :model-value="customFieldValues[index].values.includes(option.value || option)"
+                  @update:modelValue="
+                    (checked) => {
+                      const val = option.value || option
+                      if (checked) {
+                        if (!customFieldValues[index].values.includes(val)) {
+                          customFieldValues[index].values.push(val)
+                        }
+                      } else {
+                        const idx = customFieldValues[index].values.indexOf(val)
+                        if (idx > -1) customFieldValues[index].values.splice(idx, 1)
+                      }
+                    }
+                  "
+                />
+              </div>
+
+              <!-- RADIO (단일 선택) -->
+              <div v-else-if="field.dataType === 'RADIO'" class="flex flex-col space-y-1">
+                <Input
+                  v-for="(option, i) in field.options"
+                  :key="i"
+                  type="radio"
+                  :label="option"
+                  :value="option"
+                  :name="'radio-' + index"
+                  v-model="customFieldValues[index].values[0]"
+                />
+              </div>
+              
             </div>
           </div>
         </div>

@@ -84,6 +84,17 @@ const onFileChange = async (event) => {
   }
 }
 
+// dataType → dataTypeLabel 변환 맵
+const dataTypeLabelMap = {
+  TEXT: '텍스트',
+  NUMBER: '숫자',
+  DATE: '날짜',
+  TIME: '시간',
+  RADIO: '단일선택',
+  CHECKBOX: '다중선택',
+  BOOLEAN: '여부확인',
+}
+
 // 기존 서비스 그룹 정보 조회
 const getServiceGroupInfo = async () => {
   try {
@@ -96,8 +107,19 @@ const getServiceGroupInfo = async () => {
     selectedCategory.value = data.category
     isAlwaysAvailable.value = data.isAlwaysAvailable
 
-    serviceCustomFields.value = data.customFields?.filter((f) => f.targetType === 'RESOURCE') || []
-    userCustomFields.value = data.customFields?.filter((f) => f.targetType === 'USER') || []
+    // dataTypeLabel 변환 추가
+    const mapFields = (fields) =>
+      fields.map((f) => ({
+        ...f,
+        dataTypeLabel: dataTypeLabelMap[f.dataType] || f.dataType,
+      }))
+
+    serviceCustomFields.value = mapFields(
+      data.customFields?.filter((f) => f.targetType === 'RESOURCE') || [],
+    )
+    userCustomFields.value = mapFields(
+      data.customFields?.filter((f) => f.targetType === 'USER') || [],
+    )
   } catch (err) {
     console.error('서비스 그룹 정보 조회 실패:', err)
   }
@@ -120,18 +142,22 @@ const saveServiceGroup = async () => {
       isAlwaysAvailable: isAlwaysAvailable.value,
       customFields: [
         ...serviceCustomFields.value.map((f) => ({
+          id: f.id || null, // 기존 필드 ID 포함
           fieldName: f.fieldName || '',
           description: f.description || '',
           dataType: mapToEnum(f.dataType || 'TEXT'),
           targetType: 'RESOURCE',
           required: f.required ?? false,
+          options: f.options || null, // RADIO/CHECKBOX 옵션 포함
         })),
         ...userCustomFields.value.map((f) => ({
+          id: f.id || null, // 기존 필드 ID 포함
           fieldName: f.fieldName || '',
           description: f.description || '',
           dataType: mapToEnum(f.dataType || 'TEXT'),
           targetType: 'USER',
           required: f.required ?? false,
+          options: f.options || null, // RADIO/CHECKBOX 옵션 포함
         })),
       ],
     }

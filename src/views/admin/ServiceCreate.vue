@@ -86,13 +86,16 @@ const createService = async () => {
     }
   }
 
-  // 예약형 / 좌석형 필수값
-  if (serviceGroup.value.category === 'RESERVATION' || serviceGroup.value.category === 'SEAT') {
+  // 예약형 필수값 (시간 간격)
+  if (serviceGroup.value.category === 'RESERVATION') {
     if (!timeInterval.value) {
       alert('시간 간격은 필수 입력입니다.')
       return
     }
+  }
 
+  // 예약형 / 좌석형 필수값 (운영 시간)
+  if (serviceGroup.value.category === 'RESERVATION' || serviceGroup.value.category === 'SEAT') {
     const timeSlots = timeSlotRef.value?.getTimeSlots?.() || []
     const exceptionSlots = exceptionRef.value?.getExceptionSlots?.() || []
     if (!timeSlots.length && !exceptionSlots.length) {
@@ -385,7 +388,7 @@ onMounted(() => {
         </div>
 
         <!-- 시간 간격 선택 -->
-        <div v-if="serviceGroup.category != 'EVENT'" class="service-info-section">
+        <div v-if="serviceGroup.category == 'RESERVATION'" class="service-info-section">
           <div class="service-info-form-item-label-container">
             <span>시간 간격 선택</span>
           </div>
@@ -421,7 +424,11 @@ onMounted(() => {
           </div>
 
           <div class="service-info-form-inputs">
-            <TimeSlotModal ref="timeSlotRef" :interval="timeInterval" />
+            <TimeSlotModal
+              ref="timeSlotRef"
+              :interval="timeInterval"
+              :category="serviceGroup.category"
+            />
           </div>
         </div>
 
@@ -437,6 +444,7 @@ onMounted(() => {
               ref="exceptionRef"
               :interval="timeInterval"
               v-model:modelValue="exceptions"
+              :category="serviceGroup.category"
             />
           </div>
         </div>

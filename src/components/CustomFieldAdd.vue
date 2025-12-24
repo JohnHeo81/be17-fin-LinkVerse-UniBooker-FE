@@ -93,7 +93,7 @@ const addFieldFromModal = () => {
     />
     <Input
       class="input-style !w-[150px]"
-      v-model="field.dataTypeLabel"
+      :model-value="field.dataTypeLabel || field.dataType"
       placeholder="데이터 타입"
       :disabled="true"
     />
