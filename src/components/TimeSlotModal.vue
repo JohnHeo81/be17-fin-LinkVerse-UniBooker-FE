@@ -27,14 +27,27 @@ const hourOptions = Array.from({ length: 24 }, (_, i) => ({
   value: String(i).padStart(2, '0'),
 }))
 
-const minuteOptions = computed(() =>
-  props.interval === 60
+const minuteOptions = computed(() => {
+  // 좌석형: 5분 단위
+  if (props.category === 'SEAT') {
+    const options = []
+    for (let i = 0; i < 60; i += 5) {
+      options.push({
+        label: String(i).padStart(2, '0'),
+        value: String(i).padStart(2, '0'),
+      })
+    }
+    return options
+  }
+  
+  // 예약형: interval 기반 (00, 30 또는 00만)
+  return props.interval === 60
     ? [{ label: '00', value: '00' }]
     : [
         { label: '00', value: '00' },
         { label: '30', value: '30' },
-      ],
-)
+      ]
+})
 
 // 한글 ↔ 영문 요일 맵핑
 const dayMap = { 월: 'MON', 화: 'TUE', 수: 'WED', 목: 'THU', 금: 'FRI', 토: 'SAT', 일: 'SUN' }
