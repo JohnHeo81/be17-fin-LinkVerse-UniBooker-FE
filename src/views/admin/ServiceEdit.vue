@@ -69,7 +69,7 @@ const setTimeSlotsModal = (slots) => {
   })
 
   // TimeSlotModal 형식으로 변환
-  timeSlotRef.value.timeSlots = Object.entries(grouped).map(([timeRange, days]) => {
+  const mappedSlots = Object.entries(grouped).map(([timeRange, days]) => {
     const [startTime, endTime] = timeRange.split('-')
     const [sh, sm] = startTime.split(':').map(Number)
     const [eh, em] = endTime.split(':').map(Number)
@@ -86,6 +86,8 @@ const setTimeSlotsModal = (slots) => {
 
     return { days, start: startTime, end: endTime, selectedTimes }
   })
+
+  timeSlotRef.value.setTimeSlots(mappedSlots)
 }
 
 // -------------------- 서비스 정보 조회 --------------------
@@ -520,7 +522,6 @@ const back = () => {
                   v-model="customFieldValues[index].values[0]"
                 />
               </div>
-              
             </div>
           </div>
         </div>

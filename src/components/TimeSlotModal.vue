@@ -224,6 +224,9 @@ defineExpose({
 
     return result
   },
+  setTimeSlots: (slots) => {
+    timeSlots.value = slots
+  },
 })
 
 const addSlot = () => {
