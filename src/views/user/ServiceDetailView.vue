@@ -790,6 +790,22 @@ onMounted(async () => {
   await getYearMonthTimeSlots(route.params.itemId, today.getFullYear(), today.getMonth() + 1)
   await getResourceReservations(toLocalDateTimeStart(todayStr), toLocalDateTimeEnd(todayStr))
 
+  // === 첫 운영 가능 날짜 자동 선택 ===
+  const findFirstAvailableDate = () => {
+    if (!yearMonthTimeSlots.value || yearMonthTimeSlots.value.length === 0) return todayStr
+
+    const available = yearMonthTimeSlots.value.find((daySlot) => {
+      if (daySlot.date < todayStr) return false
+      if (daySlot.closed) return false
+      if (!daySlot.slots || daySlot.slots.length === 0) return false
+      return true
+    })
+
+    return available ? available.date : todayStr
+  }
+
+  selectedDate.value = findFirstAvailableDate()
+
   // 3) 입장 토큰 타이머 시작
   startCountdown()
 
