@@ -412,7 +412,7 @@ watch(
 }
 
 .sub-menu-scroll {
-  @apply flex-1 overflow-y-auto max-h-[280px];
+  @apply flex-1 overflow-y-auto max-h-[calc(100vh-400px)];
 }
 
 /* 메뉴 아이템 */
