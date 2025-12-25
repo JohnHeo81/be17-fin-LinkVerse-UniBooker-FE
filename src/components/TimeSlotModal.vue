@@ -39,7 +39,7 @@ const minuteOptions = computed(() => {
     }
     return options
   }
-  
+
   // 예약형: interval 기반 (00, 30 또는 00만)
   return props.interval === 60
     ? [{ label: '00', value: '00' }]
@@ -417,7 +417,10 @@ const editSlot = (slot, idx) => {
       <div v-for="(slot, idx) in timeSlots" :key="idx" class="add-time-item">
         <span>{{ slot.days.join(', ') }} | {{ slot.start }} ~ {{ slot.end }}</span>
         <div class="add-time-item-button-container">
-          <button @click="editSlot(slot, idx)" class="text-gray-dark">수정</button>
+          <!-- 좌석형은 수정 버튼 숨김 -->
+          <button v-if="category !== 'SEAT'" @click="editSlot(slot, idx)" class="text-gray-dark">
+            수정
+          </button>
           <button @click="removeSlot(idx)" class="text-red-600 hover:text-red-800">삭제</button>
         </div>
       </div>
