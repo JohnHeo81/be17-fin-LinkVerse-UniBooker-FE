@@ -172,6 +172,17 @@ const changeServiceStatus = async (serviceId, version, targetStatus) => {
   }
 }
 
+  // 서비스 예약 건수 조회 (TimeSlot 수정 시 충돌 확인용)
+  const getReservationCount = async (serviceId) => {
+    try {
+      const response = await axiosInstance.get(`/api/resource/${serviceId}/reservation-count`)
+      return response.data.data
+    } catch (error) {
+      console.log('예약 건수 조회 실패:', error)
+      return { count: 0 }
+    }
+  }
+
 export default {
   createServiceGroup,
   getServiceGroupPresignedURL,
@@ -192,4 +203,5 @@ export default {
   deactivateService,
   activateService,
   changeServiceStatus,
+  getReservationCount,
 }

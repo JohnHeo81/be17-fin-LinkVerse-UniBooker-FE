@@ -6,6 +6,7 @@ import TimeSlotModal from '@/components/TimeSlotModal.vue'
 import ExceptionModal from '@/components/ExceptionModal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import serviceApi from '@/services/service/service_api'
+import ReservationConflictModal from '@/components/ReservationConflictModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,6 +33,11 @@ const customFieldDefinitions = ref([])
 const customFieldValues = ref([])
 const regularTimeSlots = ref([])
 const exceptionTimeSlots = ref([])
+
+// 예약 충돌 모달 상태
+const conflictModalOpen = ref(false)
+const reservationCount = ref(0)
+const pendingFormData = ref(null)
 
 // 모달 ref
 const timeSlotRef = ref(null)
@@ -159,7 +165,7 @@ const getServiceInfo = async () => {
 }
 
 // -------------------- 서비스 수정 --------------------
-const updateService = async () => {
+const updateService = async (reservationAction = null) => {
   try {
     const timeSlots = timeSlotRef.value?.getTimeSlots?.() || []
     const exceptionSlots = exceptionRef.value?.getExceptionSlots?.() || []
@@ -193,6 +199,11 @@ const updateService = async () => {
       exceptionSlots,
     }
 
+    // reservationAction이 있으면 추가
+    if (reservationAction) {
+      formData.reservationAction = reservationAction
+    }
+
     await serviceApi.updateService(serviceId, formData)
     alert('서비스가 성공적으로 수정되었습니다!')
     router.push(
@@ -202,6 +213,38 @@ const updateService = async () => {
     console.error('❌ 서비스 수정 실패:', error)
     alert('서비스 수정 중 오류가 발생했습니다.')
   }
+}
+
+// 수정 버튼 클릭 핸들러
+const handleUpdateClick = async () => {
+  try {
+    // 예약 건수 조회
+    const result = await serviceApi.getReservationCount(serviceId)
+    reservationCount.value = result.count || 0
+
+    if (reservationCount.value > 0) {
+      // 예약이 있으면 충돌 확인 모달 열기
+      conflictModalOpen.value = true
+    } else {
+      // 예약이 없으면 바로 수정
+      await updateService()
+    }
+  } catch (error) {
+    console.error('예약 건수 조회 실패:', error)
+    // 에러 시에도 수정 진행 (기본값으로)
+    await updateService()
+  }
+}
+
+// 충돌 모달 확인 핸들러
+const handleConflictConfirm = async (action) => {
+  conflictModalOpen.value = false
+  await updateService(action)
+}
+
+// 충돌 모달 닫기 핸들러
+const handleConflictClose = () => {
+  conflictModalOpen.value = false
 }
 
 const breadcrumbItems = computed(() => [
@@ -530,10 +573,16 @@ const back = () => {
       <!-- 버튼 컨테이너 -->
       <div class="button-container">
         <Button theme="gray" @click="back">취소</Button>
-        <Button @click="updateService">수정하기</Button>
+        <Button @click="handleUpdateClick">수정하기</Button>
       </div>
     </div>
     <div v-else>loading...</div>
+    <ReservationConflictModal
+      :isOpen="conflictModalOpen"
+      :reservationCount="reservationCount"
+      @close="handleConflictClose"
+      @confirm="handleConflictConfirm"
+    />
   </AdminLayout>
 </template>
 
