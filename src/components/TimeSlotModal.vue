@@ -405,12 +405,12 @@ defineExpose({
 
 <style scoped>
 .time-slot-modal-container {
-  @apply mt-[15px];
+  @apply mt-[15px] w-full;
 }
 
 /* 슬롯 목록 */
 .slot-list-container {
-  @apply mt-[20px] flex flex-col gap-2 w-full max-w-[700px];
+  @apply mt-[20px] flex flex-col gap-2 w-full;
 }
 
 .slot-item {
