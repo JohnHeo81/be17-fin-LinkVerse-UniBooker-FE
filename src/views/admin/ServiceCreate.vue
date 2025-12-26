@@ -589,11 +589,11 @@ onMounted(() => {
 }
 
 .text-input {
-  @apply w-[600px] text-[14px];
+  @apply w-full max-w-[700px] text-[14px];
 }
 
 textarea {
-  @apply resize-none rounded placeholder-gray-400 hover:placeholder-gray-600 outline-none border-b-2 transition-all duration-200 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed text-[14px] px-2.5 py-2.5 w-[1000px] h-[125px];
+  @apply resize-none rounded placeholder-gray-400 hover:placeholder-gray-600 outline-none border-b-2 transition-all duration-200 focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed text-[14px] px-2.5 py-2.5 w-full max-w-[700px] h-[125px];
 }
 
 .radio-button-container {
@@ -647,7 +647,7 @@ textarea {
 }
 
 .service-info-form-inputs {
-  @apply flex gap-2 items-center max-w-[400px];
+  @apply flex gap-2 items-center w-full max-w-[700px];
 }
 
 .service-info-section {
