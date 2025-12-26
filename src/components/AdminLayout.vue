@@ -255,9 +255,9 @@ watch(
   <div class="admin-layout">
     <!-- 서브바 -->
     <div class="sub-bar-contaienr">
-      <div class="logo-section">
+      <router-link to="/admin/dashboard" class="logo-section">
         <img src="/assets/images/unibooker_white_logo.png" alt="UniBooker 로고" />
-      </div>
+      </router-link>
 
       <router-link to="/admin/service-group-create" class="service-group-create-button-container">
         서비스 그룹 생성
@@ -390,7 +390,7 @@ watch(
 
 /* 로고 */
 .logo-section {
-  @apply w-[100px] mx-[14px] my-[15px];
+  @apply w-[100px] mx-[14px] my-[15px] cursor-pointer;
 }
 
 /* 서비스 그룹 생성 버튼 */
