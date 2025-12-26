@@ -29,18 +29,18 @@ const customFieldValues = ref([])
 const timeSlotRef = ref(null)
 const exceptionRef = ref(null)
 
-// 사용자가 직접 입력했는지 추적
-const manuallyEdited = ref({
-  capacity: false,
-  row: false,
-  col: false,
-})
-
 watch(timeInterval, (newVal, oldVal) => {
   if (newVal !== oldVal) {
     timeSlotRef.value?.resetAll?.()
     exceptionRef.value?.resetAll?.()
     exceptions.value = []
+  }
+})
+
+// 좌석형: row * col → capacity 자동 계산
+watch([row, col], ([newRow, newCol]) => {
+  if (serviceGroup.value?.category === 'SEAT' && newRow && newCol) {
+    capacity.value = Number(newRow) * Number(newCol)
   }
 })
 
@@ -231,34 +231,6 @@ const onFileChange = async (event) => {
   }
 }
 
-// 입력 이벤트 처리
-const handleInput = (field) => {
-  manuallyEdited.value[field] = true
-}
-
-// 자동 계산
-watch([row, col, capacity], ([newRow, newCol, newCapacity]) => {
-  if (serviceGroup.value.category !== 'SEAT') return
-
-  // 행, 열이 모두 입력되고, 사용자가 수용 인원을 직접 수정하지 않은 경우
-  if (newRow && newCol && !manuallyEdited.value.capacity) {
-    capacity.value = newRow * newCol
-  }
-  // 행, 수용 인원이 입력되고, 열을 수동 수정하지 않은 경우
-  else if (newCapacity && newRow && !manuallyEdited.value.col) {
-    col.value = Math.floor(newCapacity / newRow)
-  }
-  // 열, 수용 인원이 입력되고, 행을 수동 수정하지 않은 경우
-  else if (newCapacity && newCol && !manuallyEdited.value.row) {
-    row.value = Math.floor(newCapacity / newCol)
-  }
-})
-
-// 필드 리셋 시 수동 입력 상태도 초기화
-watch([serviceGroup], () => {
-  manuallyEdited.value = { capacity: false, row: false, col: false }
-})
-
 onMounted(() => {
   getServiceGroup()
 
@@ -329,13 +301,15 @@ onMounted(() => {
       <section>
         <div class="form-label-container">
           <div>수용 인원 <span>*</span></div>
-          <p>해당 서비스의 최대 수용 인원 수를 알려주세요.</p>
+          <p v-if="serviceGroup?.category === 'SEAT'">행 × 열로 자동 계산됩니다.</p>
+          <p v-else>해당 서비스의 최대 수용 인원 수를 알려주세요.</p>
         </div>
         <Input
           class="text-input"
           v-model="capacity"
           type="number"
           placeholder="숫자로만 작성해주세요."
+          :disabled="serviceGroup?.category === 'SEAT'"
         />
       </section>
 

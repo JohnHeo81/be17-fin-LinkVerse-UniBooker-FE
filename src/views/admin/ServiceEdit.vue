@@ -52,6 +52,13 @@ watch(timeInterval, (newVal, oldVal) => {
   }
 })
 
+// 좌석형: row * col → capacity 자동 계산
+watch([row, col], ([newRow, newCol]) => {
+  if (category.value === 'SEAT' && newRow && newCol) {
+    capacity.value = Number(newRow) * Number(newCol)
+  }
+})
+
 // 정규 시간 데이터 그룹화
 const setTimeSlotsModal = (slots) => {
   if (!timeSlotRef.value) return
@@ -352,13 +359,15 @@ const back = () => {
       <section>
         <div class="form-label-container">
           <div>수용 인원 <span>*</span></div>
-          <p>해당 서비스의 최대 수용 인원 수를 알려주세요.</p>
+          <p v-if="category === 'SEAT'">행 × 열로 자동 계산됩니다.</p>
+          <p v-else>해당 서비스의 최대 수용 인원 수를 알려주세요.</p>
         </div>
         <Input
           class="text-input"
           v-model="capacity"
           type="number"
           placeholder="숫자로만 작성해주세요."
+          :disabled="category === 'SEAT'"
         />
       </section>
 
