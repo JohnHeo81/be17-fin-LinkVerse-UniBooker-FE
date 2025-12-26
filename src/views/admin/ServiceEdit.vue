@@ -63,6 +63,8 @@ watch([row, col], ([newRow, newCol]) => {
 const setTimeSlotsModal = (slots) => {
   if (!timeSlotRef.value) return
   const interval = Number(timeSlotRef.value.$props.interval || 60)
+  const isSeat = category.value === 'SEAT'
+
   const dayMapReverse = {
     MON: '월',
     TUE: '화',
@@ -73,23 +75,47 @@ const setTimeSlotsModal = (slots) => {
     SUN: '일',
   }
 
+  // 시간 형식 정규화 (HH:MM:SS → HH:MM)
+  const normalizeTime = (time) => {
+    if (!time) return ''
+    return time.substring(0, 5)
+  }
+
   // 그룹화
   const grouped = {}
   slots.forEach((slot) => {
-    const key = `${slot.startTime}-${slot.endTime}`
+    const start = normalizeTime(slot.startTime)
+    const end = normalizeTime(slot.endTime)
+    const key = `${start}-${end}`
     if (!grouped[key]) grouped[key] = []
-    grouped[key].push(dayMapReverse[slot.dayOfWeek])
+    const day = dayMapReverse[slot.dayOfWeek]
+    if (!grouped[key].includes(day)) {
+      grouped[key].push(day)
+    }
   })
 
   // TimeSlotModal 형식으로 변환
+  const dayOrder = ['월', '화', '수', '목', '금', '토', '일']
   const mappedSlots = Object.entries(grouped).map(([timeRange, days]) => {
     const [startTime, endTime] = timeRange.split('-')
+    const sortedDays = days.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b))
+
+    // 좌석형: 시작시간만
+    if (isSeat) {
+      return {
+        days: sortedDays,
+        start: startTime,
+        end: endTime,
+        selectedTimes: [startTime],
+      }
+    }
+
+    // 예약형: interval 기반 시간 생성
     const [sh, sm] = startTime.split(':').map(Number)
     const [eh, em] = endTime.split(':').map(Number)
     const startMin = sh * 60 + sm
     const endMin = eh * 60 + em
 
-    // 선택된 시간들
     const selectedTimes = []
     for (let t = startMin; t < endMin; t += interval) {
       const h = Math.floor(t / 60)
@@ -97,7 +123,7 @@ const setTimeSlotsModal = (slots) => {
       selectedTimes.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
     }
 
-    return { days, start: startTime, end: endTime, selectedTimes }
+    return { days: sortedDays, start: startTime, end: endTime, selectedTimes }
   })
 
   timeSlotRef.value.setTimeSlots(mappedSlots)
@@ -456,12 +482,7 @@ const back = () => {
           </div>
 
           <div class="service-info-form-inputs">
-            <TimeSlotModal
-              ref="timeSlotRef"
-              :interval="timeInterval"
-              :existingSlots="regularTimeSlots"
-              :category="category"
-            />
+            <TimeSlotModal ref="timeSlotRef" :interval="timeInterval" :category="category" />
           </div>
         </div>
 
