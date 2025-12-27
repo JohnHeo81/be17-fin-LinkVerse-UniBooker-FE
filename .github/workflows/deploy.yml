@@ -5,6 +5,9 @@ on:
     branches: [develop]
   workflow_dispatch:
 
+env:
+  DOCKER_IMAGE: johnheo81/unibooker-frontend
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -40,14 +43,20 @@ jobs:
           npm ci
           npm run build
 
-      - name: 📤 파일 전송
-        uses: appleboy/scp-action@v0.1.7
+      - name: 🐳 Docker Hub 로그인
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: 'dist/,Dockerfile,nginx.conf'
-          target: '/home/ec2-user/frontend'
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 🐳 Docker 이미지 빌드 & 푸시
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
 
       - name: 🚀 EC2 배포 실행
         uses: appleboy/ssh-action@v1.0.3
@@ -62,19 +71,19 @@ jobs:
             docker stop unibooker-fe || true
             docker rm unibooker-fe || true
 
-            # 이미지 및 캐시 정리
-            docker rmi unibooker-fe || true
+            # 이전 이미지 및 캐시 정리
             docker system prune -af --volumes
             docker builder prune -af
 
-            # 새 이미지 빌드 및 실행
-            docker build -t unibooker-fe .
+            # Docker Hub에서 이미지 Pull
+            docker pull ${{ env.DOCKER_IMAGE }}:latest
 
+            # 컨테이너 실행
             docker run -d \
               --name unibooker-fe \
               -p 80:80 \
               --restart unless-stopped \
-              unibooker-fe
+              ${{ env.DOCKER_IMAGE }}:latest
 
             # 헬스체크
             echo "⏳ 헬스체크 시작..."
@@ -101,7 +110,7 @@ jobs:
                 "color": 3066993,
                 "fields": [
                   {"name": "환경", "value": "Production", "inline": true},
-                  {"name": "상태", "value": "운영 중 ✨", "inline": true}
+                  {"name": "이미지", "value": "${{ env.DOCKER_IMAGE }}:${{ github.sha }}", "inline": false}
                 ]
               }]
             }' \
